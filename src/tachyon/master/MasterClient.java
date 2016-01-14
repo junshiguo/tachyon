@@ -260,7 +260,7 @@ public final class MasterClient implements Closeable {
     return null;
   }
 
-  private synchronized InetSocketAddress getMasterAddress() {
+  public synchronized InetSocketAddress getMasterAddress() {
     if (!mUseZookeeper) {
       return mMasterAddress;
     }

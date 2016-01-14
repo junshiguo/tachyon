@@ -340,4 +340,9 @@ service WorkerService {
    * Local user send heartbeat to local worker to keep its temporary folder.
    */
   void userHeartbeat(1: i64 userId)
+
+  /**
+   * Newly added. Local worker cache a block from remote.
+   */
+  bool master_cacheFromRemote(1: i64 userId, 2: ClientBlockInfo blockInfo)
 }

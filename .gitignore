@@ -1,2 +1,4 @@
 *.class
 tachyon-0.6.4-jar-with-dependencies.jar
+gen-java
+bin

@@ -37,6 +37,7 @@ import tachyon.HeartbeatThread;
 import tachyon.conf.UserConf;
 import tachyon.master.MasterClient;
 import tachyon.thrift.BlockInfoException;
+import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.FailedToCheckpointException;
 import tachyon.thrift.FileAlreadyExistException;
 import tachyon.thrift.FileDoesNotExistException;
@@ -54,18 +55,18 @@ import tachyon.util.NetworkUtils;
  * Since WorkerService.Client is not thread safe, this class has to guarantee thread safe.
  */
 public class WorkerClient implements Closeable {
-  private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
-  private final MasterClient mMasterClient;
-  private static final int CONNECTION_RETRY_TIMES = 5;
+  protected static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
+  protected final MasterClient mMasterClient;
+  protected static final int CONNECTION_RETRY_TIMES = 5;
 
-  private WorkerService.Client mClient;
-  private TProtocol mProtocol;
-  private InetSocketAddress mWorkerAddress;
-  private boolean mConnected = false;
-  private boolean mIsLocal = false;
-  private final ExecutorService mExecutorService;
-  private Future<?> mHeartbeat;
-
+  protected WorkerService.Client mClient;
+  protected TProtocol mProtocol;
+  protected InetSocketAddress mWorkerAddress;
+  protected boolean mConnected = false;
+  protected boolean mIsLocal = false;
+  protected final ExecutorService mExecutorService;
+  protected Future<?> mHeartbeat;
+  
   /**
    * Create a WorkerClient, with a given MasterClient.
    * 
@@ -439,4 +440,5 @@ public class WorkerClient implements Closeable {
       throw new IOException(e);
     }
   }
+  
 }

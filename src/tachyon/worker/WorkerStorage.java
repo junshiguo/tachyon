@@ -52,6 +52,7 @@ import tachyon.conf.CommonConf;
 import tachyon.conf.WorkerConf;
 import tachyon.master.MasterClient;
 import tachyon.thrift.BlockInfoException;
+import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.ClientFileInfo;
 import tachyon.thrift.Command;
 import tachyon.thrift.FailedToCheckpointException;
@@ -60,6 +61,7 @@ import tachyon.thrift.FileDoesNotExistException;
 import tachyon.thrift.NetAddress;
 import tachyon.thrift.OutOfSpaceException;
 import tachyon.thrift.SuspectedFileSizeException;
+import tachyon.thrift.TachyonException;
 import tachyon.util.CommonUtils;
 import tachyon.util.ThreadFactoryUtils;
 import tachyon.worker.hierarchy.StorageDir;
@@ -250,9 +252,9 @@ public class WorkerStorage {
           long currentTimeMs = System.currentTimeMillis();
           if (startCopyTimeMs + shouldTakeMs > currentTimeMs) {
             long shouldSleepMs = startCopyTimeMs + shouldTakeMs - currentTimeMs;
-            LOG.info("Checkpointed last file " + fileId + " took "
-                + (currentTimeMs - startCopyTimeMs) + " ms. Need to sleep " + shouldSleepMs
-                + " ms.");
+            LOG.info(
+                "Checkpointed last file " + fileId + " took " + (currentTimeMs - startCopyTimeMs)
+                    + " ms. Need to sleep " + shouldSleepMs + " ms.");
             CommonUtils.sleepMs(LOG, shouldSleepMs);
           }
         } catch (IOException e) {
@@ -289,20 +291,19 @@ public class WorkerStorage {
   private List<Integer> mPriorityDependencies = new ArrayList<Integer>();
 
   private final ExecutorService mCheckpointExecutor = Executors.newFixedThreadPool(
-      WorkerConf.get().WORKER_CHECKPOINT_THREADS,
-      ThreadFactoryUtils.build("checkpoint-%d"));
+      WorkerConf.get().WORKER_CHECKPOINT_THREADS, ThreadFactoryUtils.build("checkpoint-%d"));
 
   private final ExecutorService mExecutorService;
   private long mCapacityBytes;
   private ArrayList<StorageTier> mStorageTiers;
-  private final BlockingQueue<Long> mRemovedBlockIdList = new ArrayBlockingQueue<Long>(
-      Constants.WORKER_BLOCKS_QUEUE_SIZE);
+  private final BlockingQueue<Long> mRemovedBlockIdList =
+      new ArrayBlockingQueue<Long>(Constants.WORKER_BLOCKS_QUEUE_SIZE);
   /** Mapping from temporary block Information to StorageDir in which the block is */
-  private final Map<Pair<Long, Long>, StorageDir> mTempBlockLocation = Collections
-      .synchronizedMap(new HashMap<Pair<Long, Long>, StorageDir>());
+  private final Map<Pair<Long, Long>, StorageDir> mTempBlockLocation =
+      Collections.synchronizedMap(new HashMap<Pair<Long, Long>, StorageDir>());
   /** Mapping from user id to ids of temporary blocks which are being written by the user */
-  private final Multimap<Long, Long> mUserIdToTempBlockIds = Multimaps
-      .synchronizedMultimap(HashMultimap.<Long, Long>create());
+  private final Multimap<Long, Long> mUserIdToTempBlockIds =
+      Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
 
   /**
    * Main logic behind the worker process.
@@ -479,9 +480,8 @@ public class WorkerStorage {
    * @throws BlockInfoException
    * @throws IOException
    */
-  public void cacheBlock(long userId, long blockId)
-      throws FileDoesNotExistException, SuspectedFileSizeException, BlockInfoException,
-      IOException {
+  public void cacheBlock(long userId, long blockId) throws FileDoesNotExistException,
+      SuspectedFileSizeException, BlockInfoException, IOException {
     StorageDir storageDir = mTempBlockLocation.remove(new Pair<Long, Long>(userId, blockId));
     if (storageDir == null) {
       throw new FileDoesNotExistException("Block doesn't exist! blockId:" + blockId);
@@ -508,7 +508,7 @@ public class WorkerStorage {
    */
   public void cancelBlock(long userId, long blockId) {
     StorageDir storageDir = mTempBlockLocation.remove(new Pair<Long, Long>(userId, blockId));
-    
+
     if (storageDir != null) {
       mUserIdToTempBlockIds.remove(userId, blockId);
       try {
@@ -650,8 +650,8 @@ public class WorkerStorage {
         addedBlockIds.put(storageDir.getStorageDirId(), storageDir.getAddedBlockIdList());
       }
     }
-    return mMasterClient
-        .worker_heartbeat(mWorkerId, getUsedBytes(), removedBlockIds, addedBlockIds);
+    return mMasterClient.worker_heartbeat(mWorkerId, getUsedBytes(), removedBlockIds,
+        addedBlockIds);
   }
 
   /**
@@ -686,9 +686,8 @@ public class WorkerStorage {
           j ++;
         }
       }
-      StorageTier curTier =
-          new StorageTier(level, alias, dirPaths, dirCapacities, mDataFolder, mUserFolder,
-              nextStorageTier, null); // TODO add conf for UFS
+      StorageTier curTier = new StorageTier(level, alias, dirPaths, dirCapacities, mDataFolder,
+          mUserFolder, nextStorageTier, null); // TODO add conf for UFS
       curTier.initialize();
       mCapacityBytes += curTier.getCapacityBytes();
       mStorageTiers.set(level, curTier);
@@ -732,8 +731,8 @@ public class WorkerStorage {
     StorageDir storageDir = lockBlock(blockId, userId);
     if (storageDir == null) {
       return false;
-    } else if (StorageDirId.getStorageLevelAliasValue(storageDir.getStorageDirId())
-        != mStorageTiers.get(0).getAlias().getValue()) {
+    } else if (StorageDirId.getStorageLevelAliasValue(storageDir.getStorageDirId()) != mStorageTiers
+        .get(0).getAlias().getValue()) {
       long blockSize = storageDir.getBlockSize(blockId);
       StorageDir dstStorageDir = requestSpace(null, userId, blockSize);
       if (dstStorageDir == null) {
@@ -777,9 +776,8 @@ public class WorkerStorage {
     }
     while (id == 0) {
       try {
-        id =
-            mMasterClient.worker_register(mWorkerAddress, mCapacityBytes, getUsedBytes(),
-                blockIdLists);
+        id = mMasterClient.worker_register(mWorkerAddress, mCapacityBytes, getUsedBytes(),
+            blockIdLists);
       } catch (BlockInfoException e) {
         LOG.error(e.getMessage(), e);
         id = 0;
@@ -795,26 +793,27 @@ public class WorkerStorage {
 
   /**
    * Get temporary file path for some block, it is used to choose appropriate StorageDir for some
-   * block file with specified initial size. 
+   * block file with specified initial size.
    * 
    * @param userId the id of the user who wants to write the file
    * @param blockId the id of the block
-   * @param initialBytes the initial size allocated for the block 
+   * @param initialBytes the initial size allocated for the block
    * @return the temporary path of the block file
    * @throws OutOfSpaceException
-   * @throws FileAlreadyExistException 
+   * @throws FileAlreadyExistException
    */
   public String requestBlockLocation(long userId, long blockId, long initialBytes)
       throws OutOfSpaceException, FileAlreadyExistException {
     if (mTempBlockLocation.containsKey(new Pair<Long, Long>(userId, blockId))) {
-      throw new FileAlreadyExistException(String.format("Block file is being written! userId(%d)"
-          + " blockId(%d)", userId, blockId));
+      throw new FileAlreadyExistException(String
+          .format("Block file is being written! userId(%d)" + " blockId(%d)", userId, blockId));
     }
 
     StorageDir storageDir = requestSpace(null, userId, initialBytes);
     if (storageDir == null) {
-      throw new OutOfSpaceException(String.format("Failed to allocate space for block! blockId(%d)"
-          + " sizeBytes(%d)", blockId, initialBytes));
+      throw new OutOfSpaceException(
+          String.format("Failed to allocate space for block! blockId(%d)" + " sizeBytes(%d)",
+              blockId, initialBytes));
     }
     mTempBlockLocation.put(new Pair<Long, Long>(userId, blockId), storageDir);
     mUserIdToTempBlockIds.put(userId, blockId);
@@ -824,8 +823,8 @@ public class WorkerStorage {
   }
 
   /**
-   * Request space from the worker, and expecting worker return the appropriate StorageDir which
-   * has enough space for the requested space size
+   * Request space from the worker, and expecting worker return the appropriate StorageDir which has
+   * enough space for the requested space size
    * 
    * @param dirCandidate The StorageDir in which the space will be allocated.
    * @param userId The id of the user who send the request
@@ -873,7 +872,7 @@ public class WorkerStorage {
    * @param blockId The id of the block that the space is allocated for
    * @param requestBytes The requested space size, in bytes
    * @return true if succeed, false otherwise
-   * @throws FileDoesNotExistException 
+   * @throws FileDoesNotExistException
    */
   public boolean requestSpace(long userId, long blockId, long requestBytes)
       throws FileDoesNotExistException {
@@ -968,5 +967,26 @@ public class WorkerStorage {
    */
   public void userHeartbeat(long userId) {
     mUsers.userHeartbeat(userId);
+  }
+
+  public ClientBlockInfo getClientBlockInfo(long blockId) {
+    try {
+      return mMasterClient.user_getClientBlockInfo(blockId);
+    } catch (IOException e) {
+      LOG.error(e.getMessage());
+    }
+    return null;
+  }
+
+  public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) {
+    try {
+      RemoteBlockCache block = new RemoteBlockCache(this, userId, blockInfo);
+      block.cache();
+      return true;
+    } catch (OutOfSpaceException | FileAlreadyExistException | IOException | TachyonException
+        | FileDoesNotExistException e) {
+      LOG.error(e.getMessage());
+      return false;
+    }
   }
 }

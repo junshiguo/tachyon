@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +76,7 @@ import tachyon.thrift.TableColumnException;
 import tachyon.thrift.TableDoesNotExistException;
 import tachyon.thrift.TachyonException;
 import tachyon.util.CommonUtils;
+import tachyon.worker.WorkerClientRemote;
 
 /**
  * A global view of filesystem in master.
@@ -302,6 +304,27 @@ public class MasterInfo extends ImageWriter {
     mPinnedInodeFileIds = Collections.synchronizedSet(new HashSet<Integer>());
 
     mJournal.loadImage(this);
+  }
+  
+  /**
+   * Inner function called only by master. Cache the block identified by blockId from the workerFrom
+   * to workerTo.
+   * 
+   * @param workerFrom
+   * @param workerTo
+   * @param blockId
+   * @return
+   * @throws IOException
+   * @throws TException
+   */
+  public boolean _cacheBlockRemote(NetAddress worker, long blockId) throws IOException, TException {
+    MasterClient masterClient = new MasterClient(mMasterAddress, mExecutorService);
+    WorkerClientRemote workerClient = new WorkerClientRemote(masterClient, worker, null);
+    boolean ret =
+        workerClient.master_cacheFromRemote(-1, masterClient.user_getClientBlockInfo(blockId));
+    workerClient.close();
+    masterClient.close();
+    return ret;
   }
 
   /**

@@ -108,6 +108,21 @@ public class TachyonFS extends AbstractTachyonFS {
     return new TachyonFS(new InetSocketAddress(masterHost, masterPort), zookeeperMode);
   }
 
+  public TachyonFS(MasterClient master, WorkerClient worker, boolean zookeeperMode) {
+    mMasterAddress = master.getMasterAddress();
+    mZookeeperMode = zookeeperMode;
+
+    mExecutorService =
+        Executors.newFixedThreadPool(2, ThreadFactoryUtils.daemon("client-heartbeat-%d"));
+
+    mMasterClient = master;
+    mWorkerClient = worker;
+
+    String scheme = mZookeeperMode ? Constants.SCHEME_FT : Constants.SCHEME;
+    String authority = mMasterAddress.getHostName() + ":" + mMasterAddress.getPort();
+    mRootUri = new TachyonURI(scheme, authority, TachyonURI.SEPARATOR);
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
   private final long mUserQuotaUnitBytes = UserConf.get().QUOTA_UNIT_BYTES;
   private final int mUserFailedSpaceRequestLimits = UserConf.get().FAILED_SPACE_REQUEST_LIMITS;
@@ -140,9 +155,13 @@ public class TachyonFS extends AbstractTachyonFS {
 
   private TachyonURI mRootUri = null;
 
+  public MasterClient getmMasterClient() {
+    return mMasterClient;
+  }
+
   private TachyonFS(TachyonURI tachyonURI) throws IOException {
-    this(new InetSocketAddress(tachyonURI.getHost(), tachyonURI.getPort()), tachyonURI.getScheme()
-        .equals(Constants.SCHEME_FT));
+    this(new InetSocketAddress(tachyonURI.getHost(), tachyonURI.getPort()),
+        tachyonURI.getScheme().equals(Constants.SCHEME_FT));
   }
 
   private TachyonFS(InetSocketAddress masterAddress, boolean zookeeperMode) throws IOException {
@@ -879,8 +898,7 @@ public class TachyonFS extends AbstractTachyonFS {
    * @return the size bytes that allocated to the block, -1 if no local worker exists
    * @throws IOException
    */
-  public synchronized long requestSpace(long blockId, long requestSpaceBytes)
-      throws IOException {
+  public synchronized long requestSpace(long blockId, long requestSpaceBytes) throws IOException {
     if (!hasLocalWorker()) {
       return -1;
     }

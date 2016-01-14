@@ -20,6 +20,7 @@ import java.io.IOException;
 import org.apache.thrift.TException;
 
 import tachyon.thrift.BlockInfoException;
+import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.FailedToCheckpointException;
 import tachyon.thrift.FileAlreadyExistException;
 import tachyon.thrift.FileDoesNotExistException;
@@ -118,5 +119,10 @@ public class WorkerServiceHandler implements WorkerService.Iface {
   @Override
   public void userHeartbeat(long userId) throws TException {
     mWorkerStorage.userHeartbeat(userId);
+  }
+
+  @Override
+  public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) throws TException {
+    return mWorkerStorage.master_cacheFromRemote(userId, blockInfo);
   }
 }
