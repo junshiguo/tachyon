@@ -42,6 +42,7 @@ import tachyon.Constants;
 import tachyon.HeartbeatExecutor;
 import tachyon.HeartbeatThread;
 import tachyon.LeaderInquireClient;
+import tachyon.Pair;
 import tachyon.TachyonURI;
 import tachyon.Version;
 import tachyon.conf.CommonConf;
@@ -66,6 +67,7 @@ import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TableColumnException;
 import tachyon.thrift.TableDoesNotExistException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 import tachyon.util.NetworkUtils;
 
@@ -180,9 +182,8 @@ public final class MasterClient implements Closeable {
       LOG.info("Tachyon client (version " + Version.VERSION + ") is trying to connect master @ "
           + mMasterAddress);
 
-      mProtocol =
-          new TBinaryProtocol(new TFramedTransport(new TSocket(
-              NetworkUtils.getFqdnHost(mMasterAddress), mMasterAddress.getPort())));
+      mProtocol = new TBinaryProtocol(new TFramedTransport(
+          new TSocket(NetworkUtils.getFqdnHost(mMasterAddress), mMasterAddress.getPort())));
       mClient = new MasterService.Client(mProtocol);
       try {
         mProtocol.getTransport().open();
@@ -190,12 +191,11 @@ public final class MasterClient implements Closeable {
         HeartbeatExecutor heartBeater = new MasterClientHeartbeatExecutor(this);
 
         String threadName = "master-heartbeat-" + mMasterAddress;
-        mHeartbeat =
-            mExecutorService.submit(new HeartbeatThread(threadName, heartBeater,
-                UserConf.get().HEARTBEAT_INTERVAL_MS / 2));
+        mHeartbeat = mExecutorService.submit(
+            new HeartbeatThread(threadName, heartBeater, UserConf.get().HEARTBEAT_INTERVAL_MS / 2));
       } catch (TTransportException e) {
         lastException = e;
-        LOG.error("Failed to connect (" + retry.getRetryCount() + ") to master " + mMasterAddress 
+        LOG.error("Failed to connect (" + retry.getRetryCount() + ") to master " + mMasterAddress
             + " : " + e.getMessage());
         if (mHeartbeat != null) {
           mHeartbeat.cancel(true);
@@ -265,9 +265,8 @@ public final class MasterClient implements Closeable {
       return mMasterAddress;
     }
 
-    LeaderInquireClient leaderInquireClient =
-        LeaderInquireClient.getClient(CommonConf.get().ZOOKEEPER_ADDRESS,
-            CommonConf.get().ZOOKEEPER_LEADER_PATH);
+    LeaderInquireClient leaderInquireClient = LeaderInquireClient
+        .getClient(CommonConf.get().ZOOKEEPER_ADDRESS, CommonConf.get().ZOOKEEPER_LEADER_PATH);
     try {
       String temp = leaderInquireClient.getMasterAddress();
       return CommonUtils.parseInetSocketAddress(temp);
@@ -732,9 +731,9 @@ public final class MasterClient implements Closeable {
     return false;
   }
 
-  public synchronized void worker_cacheBlock(long workerId, long workerUsedBytes,
-      long storageDirId, long blockId, long length) throws IOException, FileDoesNotExistException,
-      SuspectedFileSizeException, BlockInfoException {
+  public synchronized void worker_cacheBlock(long workerId, long workerUsedBytes, long storageDirId,
+      long blockId, long length) throws IOException, FileDoesNotExistException,
+          SuspectedFileSizeException, BlockInfoException {
     while (!mIsShutdown) {
       connect();
 
@@ -781,9 +780,8 @@ public final class MasterClient implements Closeable {
     return new ArrayList<Integer>();
   }
 
-  public synchronized Command worker_heartbeat(long workerId, long usedBytes,
-      List<Long> removedBlockIds, Map<Long, List<Long>> addedBlockIds)
-      throws IOException {
+  public synchronized List<Command> worker_heartbeat(long workerId, long usedBytes,
+      List<Long> removedBlockIds, Map<Long, List<Long>> addedBlockIds) throws IOException {
     while (!mIsShutdown) {
       connect();
 
@@ -812,7 +810,7 @@ public final class MasterClient implements Closeable {
    */
   public synchronized long worker_register(NetAddress workerNetAddress, long totalBytes,
       long usedBytes, Map<Long, List<Long>> currentBlockList)
-      throws BlockInfoException, IOException {
+          throws BlockInfoException, IOException {
     while (!mIsShutdown) {
       connect();
 
@@ -830,5 +828,48 @@ public final class MasterClient implements Closeable {
       }
     }
     return -1;
+  }
+
+  public synchronized Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(
+      NetAddress workerAddress, Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId,
+      long requestBytes, boolean isLastTier) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        return mClient.worker_getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds,
+            blockId, requestBytes, isLastTier);
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+    return null;
+  }
+
+  public synchronized void user_accessFile(int fileId) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_accessFile(fileId);
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_accessBlock(long blockId) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_accessBlock(blockId);
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
   }
 }

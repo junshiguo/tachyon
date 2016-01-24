@@ -16,6 +16,7 @@
 package tachyon.worker;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.thrift.TException;
 
@@ -122,7 +123,12 @@ public class WorkerServiceHandler implements WorkerService.Iface {
   }
 
   @Override
-  public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) throws TException {
-    return mWorkerStorage.master_cacheFromRemote(userId, blockInfo);
+  public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos) throws TException {
+    return mWorkerStorage.master_cacheFromRemote(userId, blockInfos);
+  }
+
+  @Override
+  public void master_freeBlocks(List<Long> blockIds) throws TException {
+    mWorkerStorage.freeBlocks(blockIds);
   }
 }

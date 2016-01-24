@@ -57,8 +57,8 @@ public final class StorageDir {
   private final ConcurrentMap<Long, Long> mLastBlockAccessTimeMs =
       new ConcurrentHashMap<Long, Long>();
   /** List of added block Ids to be reported */
-  private final BlockingQueue<Long> mAddedBlockIdList = new ArrayBlockingQueue<Long>(
-      Constants.WORKER_BLOCKS_QUEUE_SIZE);
+  private final BlockingQueue<Long> mAddedBlockIdList =
+      new ArrayBlockingQueue<Long>(Constants.WORKER_BLOCKS_QUEUE_SIZE);
   /** List of to be removed block Ids */
   private final Set<Long> mToRemoveBlockIdSet = Collections.synchronizedSet(new HashSet<Long>());
   /** Space counter of the StorageDir */
@@ -81,11 +81,11 @@ public final class StorageDir {
   private final ConcurrentMap<Pair<Long, Long>, Long> mTempBlockAllocatedBytes =
       new ConcurrentHashMap<Pair<Long, Long>, Long>();
   /** Mapping from user Id to list of blocks locked by the user */
-  private final Multimap<Long, Long> mLockedBlocksPerUser = Multimaps
-      .synchronizedMultimap(HashMultimap.<Long, Long>create());
+  private final Multimap<Long, Long> mLockedBlocksPerUser =
+      Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
   /** Mapping from block Id to list of users that lock the block */
-  private final Multimap<Long, Long> mUserPerLockedBlock = Multimaps
-      .synchronizedMultimap(HashMultimap.<Long, Long>create());
+  private final Multimap<Long, Long> mUserPerLockedBlock =
+      Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
 
   /**
    * Create a new StorageDir.
@@ -194,7 +194,7 @@ public final class StorageDir {
    * @return true if success, false otherwise
    * @throws IOException
    */
-  public boolean cancelBlock(long userId, long blockId) throws IOException {  
+  public boolean cancelBlock(long userId, long blockId) throws IOException {
     String filePath = getUserTempFilePath(userId, blockId);
     Long allocatedBytes = mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, blockId));
     if (allocatedBytes == null) {
@@ -288,7 +288,7 @@ public final class StorageDir {
       return false;
     }
     String blockfile = getBlockFilePath(blockId);
-    // Should check lock status here 
+    // Should check lock status here
     if (!isBlockLocked(blockId)) {
       if (!mFs.delete(blockfile, false)) {
         LOG.error("Failed to delete block file! filename:{}", blockfile);
@@ -739,5 +739,14 @@ public final class StorageDir {
         }
       }
     }
+  }
+
+  /**
+   * Get all locked Blocks. For use in global eviction plan.
+   * 
+   * @return
+   */
+  public Set<Long> getLockedBlocks() {
+    return mUserPerLockedBlock.keySet();
   }
 }

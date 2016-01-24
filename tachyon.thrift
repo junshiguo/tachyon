@@ -60,17 +60,25 @@ struct ClientRawTableInfo {
   5: binary metadata
 }
 
+struct WorkerBlockInfo {
+  1: i64 storageDirId
+  2: i64 blockId
+  3: i64 blockSize
+}
+
 enum CommandType {
   Unknown = 0,
   Nothing = 1,
   Register = 2,   	// Ask the worker to re-register.
   Free = 3,		// Ask the worker to free files.
   Delete = 4,		// Ask the worker to delete files.
+  Cache = 5,
 }
 
 struct Command {
   1: CommandType mCommandType
   2: list<i64> mData
+  3: list<ClientBlockInfo> mBlockInfo
 }
 
 exception BlockInfoException {
@@ -148,7 +156,7 @@ service MasterService {
    * return the command from master to worker. addedBlockIds maps from id of storage directory
    * to the blocks added in it.
    */
-  Command worker_heartbeat(1: i64 workerId, 2: i64 usedBytes, 3: list<i64> removedBlockIds,
+  list<Command> worker_heartbeat(1: i64 workerId, 2: i64 usedBytes, 3: list<i64> removedBlockIds,
       4: map<i64, list<i64>> addedBlockIds)
     throws (1: BlockInfoException e)
 
@@ -263,6 +271,15 @@ service MasterService {
 
   bool user_freepath(1: i32 fileId, 2: string path, 3: bool recursive)
     throws (1: FileDoesNotExistException e)
+
+  /**
+   * newly added. blockId: the block that need space, used to get which file is requesting space
+   */
+  map<i64, list<WorkerBlockInfo>> worker_getBlocksToEvict(1: NetAddress workerAddress, 2: set<i64> lockedBlocks, 3: list<i64> candidateDir, 4: i64 blockId, 5: i64 requestBytes, 6: bool isLastTier)
+
+  void user_accessFile(1: i32 fileId)
+
+  void user_accessBlock(1: i64 blockId)
 }
 
 service WorkerService {
@@ -344,5 +361,10 @@ service WorkerService {
   /**
    * Newly added. Local worker cache a block from remote.
    */
-  bool master_cacheFromRemote(1: i64 userId, 2: ClientBlockInfo blockInfo)
+  bool master_cacheFromRemote(1: i64 userId, 2: list<ClientBlockInfo> blockInfos)
+
+  /**
+   * Newly added. Master call this to explicitly free a block.
+   */
+  void master_freeBlocks(1: list<i64> blockIds)
 }

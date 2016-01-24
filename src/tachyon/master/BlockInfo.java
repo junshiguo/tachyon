@@ -28,6 +28,7 @@ import tachyon.StorageLevelAlias;
 import tachyon.UnderFileSystem;
 import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.NetAddress;
+import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.NetworkUtils;
 
 /**
@@ -114,6 +115,16 @@ public class BlockInfo {
     ret.offset = mOffset;
     ret.length = mLength;
     ret.locations = getLocations();
+
+    return ret;
+  }
+
+  public synchronized WorkerBlockInfo generateWorkerBlockInfo(NetAddress address) {
+    WorkerBlockInfo ret = new WorkerBlockInfo();
+
+    ret.blockId = mBlockId;
+    ret.blockSize = mLength;
+    ret.storageDirId = mStorageDirIds.get(address);
 
     return ret;
   }

@@ -35,7 +35,7 @@ public final class EvictPartialLRU extends EvictLRUBase {
 
   @Override
   public synchronized Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
-      Set<Integer> pinList, long requestBytes) {
+      Set<Integer> pinList, long requestBytes, long blockId) {
     List<BlockInfo> blockInfoList = new ArrayList<BlockInfo>();
     Set<StorageDir> ignoredDirs = new HashSet<StorageDir>();
     StorageDir dirSelected = getDirWithMaxFreeSpace(requestBytes, storageDirs, ignoredDirs);

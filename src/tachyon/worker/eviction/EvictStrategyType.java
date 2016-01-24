@@ -15,6 +15,8 @@
 
 package tachyon.worker.eviction;
 
+import javax.xml.bind.annotation.XmlElementDecl.GLOBAL;
+
 /**
  * Different types of EvictionStrategy, currently LRU based strategies are implemented
  */
@@ -26,5 +28,9 @@ public enum EvictStrategyType {
   /**
    * Evict old blocks in certain StorageDir by LRU.
    */
-  PARTIAL_LRU;
+  PARTIAL_LRU,
+  /**
+   * Evict based on global info. Calling master function to decide.
+   */
+  GLOBAL;
 }

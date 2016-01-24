@@ -15,6 +15,9 @@
 
 package tachyon.worker.eviction;
 
+import tachyon.worker.WorkerStorage;
+import tachyon.worker.hierarchy.StorageTier;
+
 /**
  * Used to get specific EvictStrategy by EvictStrategyType
  */
@@ -26,12 +29,15 @@ public class EvictStrategies {
    * @param isLastTier whether eviction is on last StorageTier
    * @return EvictStrategy generated
    */
-  public static EvictStrategy getEvictStrategy(EvictStrategyType strategyType, boolean isLastTier) {
+  public static EvictStrategy getEvictStrategy(EvictStrategyType strategyType, boolean isLastTier,
+      WorkerStorage workerStorage) {
     switch (strategyType) {
       case LRU:
         return new EvictLRU(isLastTier);
       case PARTIAL_LRU:
         return new EvictPartialLRU(isLastTier);
+      case GLOBAL:
+        return new EvictGlobal(isLastTier, workerStorage);
       default:
         return new EvictLRU(isLastTier);
     }

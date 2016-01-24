@@ -28,6 +28,7 @@ import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.ClientFileInfo;
 import tachyon.thrift.NetAddress;
 import tachyon.thrift.SuspectedFileSizeException;
+import tachyon.thrift.WorkerBlockInfo;
 
 /**
  * Tachyon file system's file representation in master.
@@ -273,6 +274,26 @@ public class InodeFile extends Inode {
       ret.add(tInfo.generateClientBlockInfo());
     }
     return ret;
+  }
+
+  /**
+   * newly added.
+   * 
+   * @param blockIndex
+   * @param address
+   * @return
+   * @throws BlockInfoException
+   */
+  public synchronized WorkerBlockInfo getWorkerBlockInfo(int blockIndex, NetAddress address)
+      throws BlockInfoException {
+    if (address == null) {
+      return null;
+    }
+    if (blockIndex < 0 || blockIndex >= mBlocks.size()) {
+      throw new BlockInfoException("BlockIndex is out of the boundry: " + blockIndex);
+    }
+
+    return mBlocks.get(blockIndex).generateWorkerBlockInfo(address);
   }
 
   /**

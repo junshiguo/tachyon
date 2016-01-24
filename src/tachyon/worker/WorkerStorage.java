@@ -62,8 +62,10 @@ import tachyon.thrift.NetAddress;
 import tachyon.thrift.OutOfSpaceException;
 import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 import tachyon.util.ThreadFactoryUtils;
+import tachyon.worker.hierarchy.BlockInfo;
 import tachyon.worker.hierarchy.StorageDir;
 import tachyon.worker.hierarchy.StorageTier;
 
@@ -592,6 +594,12 @@ public class WorkerStorage {
     return null;
   }
 
+  public StorageDir getStorageDirByDirId(long storageDirId) {
+    StorageDir storageDir = null;
+    StorageTier storageTier = mStorageTiers.get(StorageDirId.getStorageLevel(storageDirId));
+    return storageTier.getmDirs()[StorageDirId.getStorageDirIndex(storageDirId)];
+  }
+
   /**
    * @return The orphans' folder in the under file system
    */
@@ -639,7 +647,7 @@ public class WorkerStorage {
    * @return The Command received from the Master
    * @throws IOException
    */
-  public Command heartbeat() throws IOException {
+  public List<Command> heartbeat() throws IOException {
     List<Long> removedBlockIds = new ArrayList<Long>();
     Map<Long, List<Long>> addedBlockIds = new HashMap<Long, List<Long>>();
 
@@ -687,7 +695,7 @@ public class WorkerStorage {
         }
       }
       StorageTier curTier = new StorageTier(level, alias, dirPaths, dirCapacities, mDataFolder,
-          mUserFolder, nextStorageTier, null); // TODO add conf for UFS
+          mUserFolder, nextStorageTier, null, this); // TODO add conf for UFS
       curTier.initialize();
       mCapacityBytes += curTier.getCapacityBytes();
       mStorageTiers.set(level, curTier);
@@ -734,7 +742,7 @@ public class WorkerStorage {
     } else if (StorageDirId.getStorageLevelAliasValue(storageDir.getStorageDirId()) != mStorageTiers
         .get(0).getAlias().getValue()) {
       long blockSize = storageDir.getBlockSize(blockId);
-      StorageDir dstStorageDir = requestSpace(null, userId, blockSize);
+      StorageDir dstStorageDir = requestSpace(null, userId, blockSize, blockId);
       if (dstStorageDir == null) {
         LOG.error("Failed to promote block! blockId:{}", blockId);
         storageDir.unlockBlock(blockId, userId);
@@ -809,7 +817,7 @@ public class WorkerStorage {
           .format("Block file is being written! userId(%d)" + " blockId(%d)", userId, blockId));
     }
 
-    StorageDir storageDir = requestSpace(null, userId, initialBytes);
+    StorageDir storageDir = requestSpace(null, userId, initialBytes, blockId);
     if (storageDir == null) {
       throw new OutOfSpaceException(
           String.format("Failed to allocate space for block! blockId(%d)" + " sizeBytes(%d)",
@@ -831,7 +839,8 @@ public class WorkerStorage {
    * @param requestBytes The requested space size, in bytes
    * @return StorageDir assigned, null if failed
    */
-  private StorageDir requestSpace(StorageDir dirCandidate, long userId, long requestBytes) {
+  private StorageDir requestSpace(StorageDir dirCandidate, long userId, long requestBytes,
+      long requestBlockId) {
     Set<Integer> pinList;
 
     try {
@@ -846,10 +855,11 @@ public class WorkerStorage {
     try {
       if (dirCandidate == null) {
         // if StorageDir candidate is not set, request space from all available StorageDirs
-        dir = mStorageTiers.get(0).requestSpace(userId, requestBytes, pinList, removedBlockIds);
+        dir = mStorageTiers.get(0).requestSpace(userId, requestBytes, pinList, removedBlockIds,
+            requestBlockId);
       } else { // request space from the StorageDir specified
         if (mStorageTiers.get(0).requestSpace(dirCandidate, userId, requestBytes, pinList,
-            removedBlockIds)) {
+            removedBlockIds, requestBlockId)) {
           dir = dirCandidate;
         }
       }
@@ -881,7 +891,7 @@ public class WorkerStorage {
       throw new FileDoesNotExistException("Temporary block file doesn't exist! blockId:" + blockId);
     }
 
-    if (storageDir == requestSpace(storageDir, userId, requestBytes)) {
+    if (storageDir == requestSpace(storageDir, userId, requestBytes, blockId)) {
       storageDir.updateTempBlockAllocatedBytes(userId, blockId, requestBytes);
       return true;
     } else {
@@ -988,5 +998,35 @@ public class WorkerStorage {
       LOG.error(e.getMessage());
       return false;
     }
+  }
+
+  public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos) {
+    boolean ret = true;
+    for (ClientBlockInfo blockInfo : blockInfos) {
+      if (master_cacheFromRemote(userId, blockInfo) == false) {
+        ret = false;
+      }
+    }
+    return ret;
+  }
+
+  public Map<Long, List<WorkerBlockInfo>> getBlocksToEvict(NetAddress workerAddress,
+      Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId, long requestBytes,
+      boolean isLastTier) throws IOException {
+    return mMasterClient.worker_getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds,
+        blockId, requestBytes, isLastTier);
+  }
+
+  public NetAddress getmWorkerAddress() {
+    return mWorkerAddress;
+  }
+
+  public ArrayList<StorageTier> getmStorageTiers() {
+    return mStorageTiers;
+  }
+
+  public BlockInfo getBlockInfo(WorkerBlockInfo workerBlockInfo) {
+    return new BlockInfo(getStorageDirByDirId(workerBlockInfo.storageDirId),
+        workerBlockInfo.blockId, workerBlockInfo.blockSize);
   }
 }
