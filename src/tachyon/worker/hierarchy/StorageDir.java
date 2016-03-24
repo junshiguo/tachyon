@@ -45,6 +45,7 @@ import tachyon.Users;
 import tachyon.util.CommonUtils;
 import tachyon.worker.BlockHandler;
 import tachyon.worker.SpaceCounter;
+import tachyon.worker.WorkerStorage;
 
 /**
  * Stores and manages block files in storage's directory in different storage systems.
@@ -86,6 +87,10 @@ public final class StorageDir {
   /** Mapping from block Id to list of users that lock the block */
   private final Multimap<Long, Long> mUserPerLockedBlock =
       Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
+  /**
+   * Newly added!!! It's not good to expose workerStorage in StorageDir
+   */
+  private final WorkerStorage mWorkerStorage;
 
   /**
    * Create a new StorageDir.
@@ -97,8 +102,9 @@ public final class StorageDir {
    * @param userTempFolder the temporary folder for users in the StorageDir
    * @param conf the configuration of the under file system
    */
-  StorageDir(long storageDirId, String dirPath, long capacityBytes, String dataFolder,
-      String userTempFolder, Object conf) {
+  StorageDir(WorkerStorage workerStorage, long storageDirId, String dirPath, long capacityBytes,
+      String dataFolder, String userTempFolder, Object conf) {
+    mWorkerStorage = workerStorage;
     mStorageDirId = storageDirId;
     mDirPath = new TachyonURI(dirPath);
     mSpaceCounter = new SpaceCounter(capacityBytes);
@@ -106,6 +112,14 @@ public final class StorageDir {
     mUserTempPath = mDirPath.join(userTempFolder);
     mConf = conf;
     mFs = UnderFileSystem.get(dirPath, conf);
+  }
+
+  /**
+   * for test
+   */
+  StorageDir(long storageDirId, String dirPath, long capacityBytes, String dataFolder,
+      String userTempFolder, Object conf) {
+    this(null, storageDirId, dirPath, capacityBytes, dataFolder, userTempFolder, conf);
   }
 
   /**
@@ -147,6 +161,10 @@ public final class StorageDir {
         mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
       }
       mBlockSizes.put(blockId, sizeBytes);
+      if (mWorkerStorage != null) {
+        mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
+            sizeBytes); // newly added ugly code
+      }
       if (report) {
         mAddedBlockIdList.add(blockId);
       }
@@ -310,6 +328,10 @@ public final class StorageDir {
   private void deleteBlockId(long blockId) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.remove(blockId);
+      if (mWorkerStorage != null) {
+        mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
+            -getBlockSize(blockId)); // newly added ugly code
+      }
       mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
       if (mAddedBlockIdList.contains(blockId)) {
         mAddedBlockIdList.remove(blockId);

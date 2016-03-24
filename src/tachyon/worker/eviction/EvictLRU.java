@@ -38,7 +38,7 @@ public final class EvictLRU extends EvictLRUBase {
 
   @Override
   public synchronized Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
-      Set<Integer> pinList, long requestBytes, long requestBlockId) {
+      Set<Integer> pinList, long requestBytes) {
     List<BlockInfo> blockInfoList = new ArrayList<BlockInfo>();
     Map<StorageDir, Pair<Long, Long>> dir2LRUBlocks = new HashMap<StorageDir, Pair<Long, Long>>();
     HashMultimap<StorageDir, Long> dir2BlocksToEvict = HashMultimap.create();

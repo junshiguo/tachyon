@@ -34,10 +34,11 @@ public class CommonConf extends Utils {
 
   private static CommonConf sCommonConf = null;
 
-  public static final ImmutableList<String> DEFAULT_HADOOP_UFS_PREFIX = ImmutableList.of("hdfs://",
-      "s3://", "s3n://", "glusterfs:///");
+  public static final ImmutableList<String> DEFAULT_HADOOP_UFS_PREFIX =
+      ImmutableList.of("hdfs://", "s3://", "s3n://", "glusterfs:///");
 
   private static final String DEFAULT_HOME = "/mnt/tachyon_default_home";
+
   /**
    * This is for unit test only. DO NOT use it for other purpose.
    */
@@ -99,9 +100,8 @@ public class CommonConf extends Utils {
         getProperty("tachyon.workers.folder", UNDERFS_ADDRESS + "/tachyon/workers");
     UNDERFS_HDFS_IMPL =
         getProperty("tachyon.underfs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
-    UNDERFS_GLUSTERFS_IMPL =
-        getProperty("tachyon.underfs.glusterfs.impl",
-            "org.apache.hadoop.fs.glusterfs.GlusterFileSystem");
+    UNDERFS_GLUSTERFS_IMPL = getProperty("tachyon.underfs.glusterfs.impl",
+        "org.apache.hadoop.fs.glusterfs.GlusterFileSystem");
     UNDERFS_GLUSTERFS_VOLUMES = getProperty("tachyon.underfs.glusterfs.volumes", null);
     UNDERFS_GLUSTERFS_MOUNTS = getProperty("tachyon.underfs.glusterfs.mounts", null);
     UNDERFS_GLUSTERFS_MR_DIR =

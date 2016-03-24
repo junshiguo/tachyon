@@ -49,8 +49,8 @@ public class UnderFileSystemHdfs extends UnderFileSystem {
   private FileSystem mFs = null;
   private String mUfsPrefix = null;
   // TODO add sticky bit and narrow down the permission in hadoop 2
-  private static final FsPermission PERMISSION = new FsPermission((short) 0777)
-      .applyUMask(FsPermission.createImmutable((short) 0000));
+  private static final FsPermission PERMISSION =
+      new FsPermission((short) 0777).applyUMask(FsPermission.createImmutable((short) 0000));
 
   public static UnderFileSystemHdfs getClient(String path) {
     return new UnderFileSystemHdfs(path, null);
@@ -80,7 +80,7 @@ public class UnderFileSystemHdfs extends UnderFileSystem {
       if (tConf.get("fs.glusterfs.volumes") == null) {
         tConf.set("fs.glusterfs.volumes", CommonConf.get().UNDERFS_GLUSTERFS_VOLUMES);
         tConf.set("fs.glusterfs.volume.fuse." + CommonConf.get().UNDERFS_GLUSTERFS_VOLUMES,
-                  CommonConf.get().UNDERFS_GLUSTERFS_MOUNTS);
+            CommonConf.get().UNDERFS_GLUSTERFS_MOUNTS);
       }
     } else {
       tConf.set("fs.hdfs.impl", CommonConf.get().UNDERFS_HDFS_IMPL);

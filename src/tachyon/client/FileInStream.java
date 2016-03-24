@@ -187,14 +187,14 @@ public class FileInStream extends InStream {
       long skip = mCurrentBlockInStream.skip(shouldSkip);
       mCurrentBlockLeft = mBlockCapacity - skip;
       if (skip != shouldSkip) {
-        throw new IOException("The underlayer BlockInStream only skip " + skip + " instead of "
-            + shouldSkip);
+        throw new IOException(
+            "The underlayer BlockInStream only skip " + skip + " instead of " + shouldSkip);
       }
     } else {
       long skip = mCurrentBlockInStream.skip(ret);
       if (skip != ret) {
-        throw new IOException("The underlayer BlockInStream only skip " + skip + " instead of "
-            + ret);
+        throw new IOException(
+            "The underlayer BlockInStream only skip " + skip + " instead of " + ret);
       }
     }
 

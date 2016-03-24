@@ -118,8 +118,8 @@ public class InodeFile extends Inode {
       throw new BlockInfoException("BLOCK_INDEX unmatch: " + mBlocks.size() + " != " + blockInfo);
     }
     if (blockInfo.mOffset != mBlocks.size() * mBlockSizeByte) {
-      throw new BlockInfoException("OFFSET unmatch: " + mBlocks.size() * mBlockSizeByte + " != "
-          + blockInfo);
+      throw new BlockInfoException(
+          "OFFSET unmatch: " + mBlocks.size() * mBlockSizeByte + " != " + blockInfo);
     }
     if (blockInfo.mLength > mBlockSizeByte) {
       throw new BlockInfoException("LENGTH too big: " + mBlockSizeByte + " " + blockInfo);
@@ -455,8 +455,8 @@ public class InodeFile extends Inode {
    * @throws SuspectedFileSizeException
    * @throws BlockInfoException
    */
-  public synchronized void setLength(long length) throws SuspectedFileSizeException,
-      BlockInfoException {
+  public synchronized void setLength(long length)
+      throws SuspectedFileSizeException, BlockInfoException {
     if (isComplete()) {
       throw new SuspectedFileSizeException("InodeFile length was set previously.");
     }
@@ -487,15 +487,14 @@ public class InodeFile extends Inode {
   @Override
   public synchronized void writeImage(ObjectWriter objWriter, DataOutputStream dos)
       throws IOException {
-    ImageElement ele =
-        new ImageElement(ImageElementType.InodeFile)
-            .withParameter("creationTimeMs", getCreationTimeMs()).withParameter("id", getId())
-            .withParameter("name", getName()).withParameter("parentId", getParentId())
-            .withParameter("blockSizeByte", getBlockSizeByte())
-            .withParameter("length", getLength()).withParameter("complete", isComplete())
-            .withParameter("pin", isPinned()).withParameter("cache", isCache())
-            .withParameter("ufsPath", getUfsPath()).withParameter("depId", getDependencyId())
-            .withParameter("lastModificationTimeMs", getLastModificationTimeMs());
+    ImageElement ele = new ImageElement(ImageElementType.InodeFile)
+        .withParameter("creationTimeMs", getCreationTimeMs()).withParameter("id", getId())
+        .withParameter("name", getName()).withParameter("parentId", getParentId())
+        .withParameter("blockSizeByte", getBlockSizeByte()).withParameter("length", getLength())
+        .withParameter("complete", isComplete()).withParameter("pin", isPinned())
+        .withParameter("cache", isCache()).withParameter("ufsPath", getUfsPath())
+        .withParameter("depId", getDependencyId())
+        .withParameter("lastModificationTimeMs", getLastModificationTimeMs());
 
     writeElement(objWriter, dos, ele);
   }

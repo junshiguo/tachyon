@@ -395,9 +395,8 @@ public class Performance {
     GeneralWorker[] workerThreads = new GeneralWorker[sThreads];
     int t = sFiles / sThreads;
     for (int thread = 0; thread < sThreads; thread ++) {
-      workerThreads[thread] =
-          new GeneralWorker(thread, t * thread, t * (thread + 1), bufs[thread], write, memoryOnly,
-              msg);
+      workerThreads[thread] = new GeneralWorker(thread, t * thread, t * (thread + 1), bufs[thread],
+          write, memoryOnly, msg);
     }
 
     final long startTimeMs = System.currentTimeMillis();
@@ -434,11 +433,11 @@ public class Performance {
     int t = sFiles / sThreads;
     for (int thread = 0; thread < sThreads; thread ++) {
       if (write) {
-        workerThreads[thread] = new TachyonWriterWorker(thread, t * thread, t * (thread + 1),
-            bufs[thread]);
+        workerThreads[thread] =
+            new TachyonWriterWorker(thread, t * thread, t * (thread + 1), bufs[thread]);
       } else {
-        workerThreads[thread] = new TachyonReadWorker(thread, t * thread, t * (thread + 1),
-            bufs[thread]);
+        workerThreads[thread] =
+            new TachyonReadWorker(thread, t * thread, t * (thread + 1), bufs[thread]);
       }
     }
 
@@ -475,8 +474,8 @@ public class Performance {
     int t = sFiles / sThreads;
     String msg = (write ? "Write " : "Read ");
     for (int thread = 0; thread < sThreads; thread ++) {
-      workerThreads[thread] = new HdfsWorker(thread, t * thread, t * (thread + 1), bufs[thread],
-          write, msg);
+      workerThreads[thread] =
+          new HdfsWorker(thread, t * thread, t * (thread + 1), bufs[thread], write, msg);
     }
 
     final long startTimeMs = System.currentTimeMillis();
@@ -521,12 +520,12 @@ public class Performance {
     sFileBytes = sBlocksPerFile * sBlockSizeBytes;
     sFilesBytes = 1L * sFileBytes * sFiles;
 
-    sResultPrefix =
-        String.format("Threads %d FilesPerThread %d TotalFiles %d "
+    sResultPrefix = String.format(
+        "Threads %d FilesPerThread %d TotalFiles %d "
             + "BLOCK_SIZE_KB %d BLOCKS_PER_FILE %d FILE_SIZE_MB %d "
-            + "Tachyon_WRITE_BUFFER_SIZE_KB %d BaseFileNumber %d : ", sThreads, sFiles / sThreads,
-            sFiles, sBlockSizeBytes / 1024, sBlocksPerFile, CommonUtils.getMB(sFileBytes),
-            UserConf.get().FILE_BUFFER_BYTES / 1024, sBaseFileNumber);
+            + "Tachyon_WRITE_BUFFER_SIZE_KB %d BaseFileNumber %d : ",
+        sThreads, sFiles / sThreads, sFiles, sBlockSizeBytes / 1024, sBlocksPerFile,
+        CommonUtils.getMB(sFileBytes), UserConf.get().FILE_BUFFER_BYTES / 1024, sBaseFileNumber);
 
     for (int k = 0; k < 10000000; k ++) {
       // Warmup

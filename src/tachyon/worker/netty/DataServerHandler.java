@@ -109,9 +109,8 @@ public final class DataServerHandler extends ChannelInboundHandlerAdapter {
       throw new IllegalArgumentException(msg);
     }
     if (req.getLength() != -1 && req.getOffset() + req.getLength() > fileLength) {
-      String msg =
-          String.format("Offset(%d) plus length(%d) is larger than file length(%d)",
-              req.getOffset(), req.getLength(), fileLength);
+      String msg = String.format("Offset(%d) plus length(%d) is larger than file length(%d)",
+          req.getOffset(), req.getLength(), fileLength);
       throw new IllegalArgumentException(msg);
     }
   }

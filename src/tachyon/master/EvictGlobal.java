@@ -6,31 +6,48 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-
-import org.hsqldb.lib.HashSet;
+import java.util.concurrent.ConcurrentMap;
 
 import tachyon.Pair;
 import tachyon.thrift.BlockInfoException;
 import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.FileDoesNotExistException;
-import tachyon.thrift.MasterService.AsyncProcessor.liststatus;
 import tachyon.thrift.NetAddress;
 import tachyon.thrift.WorkerBlockInfo;
 
 public class EvictGlobal {
-  private static long QUEUE_SIZE = 100 * 1024 * 1024 * 1024;
+  private static final long QUEUE_SIZE = 100 * 1024 * 1024 * 1024;
+
+  /**
+   * Newly added. Map from worker id to <file id, in memory bytes>. It's state should be consistent
+   * with {@link tachyon.master.InodeFile}mBlocks. Updated when InodeFile.mBlocks changes.
+   */
+  private final ConcurrentMap<Long, ConcurrentMap<Integer, Long>> mWorkerIdToFileDistribution =
+      new ConcurrentHashMap<>();
   /**
    * A map from file ID's to max in-memory block numbers. This is managed by master, looked up when
    * eviction happens and updated upon a file access.
    */
-  private final Map<Long, Long> mFileIdToMaxMem = new HashMap<>();
+  private final Map<Integer, Long> mFileIdToMaxMem = new HashMap<>();
+
   private final MasterInfo mMasterInfo;
-  private Long mFileQueueLength = 0L, mBlockQueueLength = 0L;
+  private Long mFileQueueLength = 0L;
+  private Long mBlockQueueLength = 0L;
+  /**
+   * file id to length
+   */
   private final ConcurrentLinkedQueue<Pair<Integer, Long>> mAccessQueueFile =
       new ConcurrentLinkedQueue<>();
+  private final ConcurrentMap<Integer, Long> mAccessTimeFile =
+      new ConcurrentHashMap<Integer, Long>();
+  /**
+   * block id to length
+   */
   private final ConcurrentLinkedQueue<Pair<Long, Long>> mAccessQueueBlock =
       new ConcurrentLinkedQueue<>();
+  private final ConcurrentMap<Long, Long> mAccessTimeBlock = new ConcurrentHashMap<>();
   private final Map<Long, List<Long>> mWorkerIdToEvictionCandidate = new HashMap<>();
 
   public EvictGlobal(MasterInfo masterInfo) {
@@ -38,7 +55,8 @@ public class EvictGlobal {
   }
 
   public synchronized Map<Long, List<WorkerBlockInfo>> getBlocksToEvict(NetAddress workerAddress,
-      Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId, long requestBytes, boolean isLastTier) {
+      Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId, long requestBytes,
+      boolean isLastTier) {
     List<WorkerBlockInfo> toEvictBlockInfos = new ArrayList<>();
     List<Long> toEvictBlockIds = new ArrayList<>();
     Map<Long, Long> sizeToEvict = new HashMap<Long, Long>(); // storage id to size
@@ -71,7 +89,8 @@ public class EvictGlobal {
             evictBytes = workerBlockInfo.blockSize;
           }
           sizeToEvict.put(workerBlockInfo.storageDirId, evictBytes);
-          if (sizeToEvict.get(workerBlockInfo.storageDirId) >= requestBytes) {
+          if (sizeToEvict.get(workerBlockInfo.storageDirId) >= requestBytes
+              && candidateDirIds.contains(workerBlockInfo.storageDirId)) {
             retDirId = workerBlockInfo.storageDirId;
           }
         } catch (FileDoesNotExistException e) {
@@ -83,14 +102,18 @@ public class EvictGlobal {
     }
     Map<Long, List<WorkerBlockInfo>> ret = new HashMap<>();
     // if bytes evicted from the candidate list is already enough, return
-    //TODO: check dirs in candidateDir
     if (retDirId != null) {
       ret.put(retDirId, toEvictBlockInfos);
       return ret;
     }
     // use global info: pinlist, memory consumption of each file, allocated space of each file
+    List<Integer> pinList = mMasterInfo.getPinIdList();
+    ConcurrentMap<Integer, Long> fileDistribution = mWorkerIdToFileDistribution.get(workerId);
+    MasterWorkerInfo workerInfo = mMasterInfo.getWorkerInfo(workerId);
     while (true) {
-
+      for (Integer fileId : fileDistribution.keySet()) {
+        // if (mMasterInfo.get)
+      }
       break;
     }
     // TODO: evict info
@@ -109,7 +132,7 @@ public class EvictGlobal {
    */
   public void updateLRUCandidateFile() throws FileDoesNotExistException {
     synchronized (mWorkerIdToEvictionCandidate) {
-      synchronized (mFileQueueLength) {
+      synchronized (mAccessQueueFile) {
         while (mFileQueueLength > QUEUE_SIZE) {
           Pair<Integer, Long> file = mAccessQueueFile.poll();
           if (file == null) {
@@ -117,9 +140,16 @@ public class EvictGlobal {
                 .debug("EvictGlobal.updsateLRUCandidateFile: mAccessQueueFile is empty");
             return;
           }
+          mFileQueueLength -= file.getSecond();
+          if (mAccessTimeFile.get(file.getFirst()) > file.getSecond()) {
+            continue;
+          }
           List<ClientBlockInfo> clientBlockInfos = mMasterInfo.getFileBlocks(file.getFirst());
           for (ClientBlockInfo blockInfo : clientBlockInfos) {
             for (NetAddress address : blockInfo.getLocations()) {
+              if (address.mSecondaryPort == -1) {
+                continue;
+              }
               long workerId = mMasterInfo.getmWorkerAddressToId().get(address);
               if (mWorkerIdToEvictionCandidate.containsKey(workerId) == false) {
                 mWorkerIdToEvictionCandidate.put(workerId, new ArrayList<Long>());
@@ -127,7 +157,6 @@ public class EvictGlobal {
               mWorkerIdToEvictionCandidate.get(workerId).add(blockInfo.getBlockId());
             }
           }
-          mFileQueueLength -= file.getSecond();
         }
       }
     }
@@ -142,7 +171,7 @@ public class EvictGlobal {
    */
   public void updateLRUCandidateBlock() throws FileDoesNotExistException, BlockInfoException {
     synchronized (mWorkerIdToEvictionCandidate) {
-      synchronized (mBlockQueueLength) {
+      synchronized (mAccessQueueBlock) {
         while (mBlockQueueLength > QUEUE_SIZE) {
           Pair<Long, Long> block = mAccessQueueBlock.poll();
           if (block == null) {
@@ -150,15 +179,21 @@ public class EvictGlobal {
                 .debug("EvictGlobal.updateLRUCandidateBlock: mAccessQueueBlock is empty");
             return;
           }
+          mBlockQueueLength -= block.getSecond();
+          if (mAccessTimeBlock.get(block.getFirst()) > block.getSecond()) {
+            continue;
+          }
           ClientBlockInfo blockInfo = mMasterInfo.getClientBlockInfo(block.getFirst());
           for (NetAddress address : blockInfo.getLocations()) {
+            if (address.mSecondaryPort == -1) {
+              continue;
+            }
             long workerId = mMasterInfo.getmWorkerAddressToId().get(address);
             if (mWorkerIdToEvictionCandidate.containsKey(workerId) == false) {
               mWorkerIdToEvictionCandidate.put(workerId, new ArrayList<Long>());
             }
             mWorkerIdToEvictionCandidate.get(workerId).add(blockInfo.getBlockId());
           }
-          mBlockQueueLength -= block.getSecond();
         }
       }
     }
@@ -190,6 +225,7 @@ public class EvictGlobal {
     }
     long length = ((InodeFile) inode).getLength();
     mAccessQueueFile.add(new Pair<Integer, Long>(fileId, length));
+    mAccessTimeFile.put(fileId, length);
     mFileQueueLength += length;
   }
 
@@ -197,6 +233,7 @@ public class EvictGlobal {
     try {
       long length = mMasterInfo.getClientBlockInfo(blockId).length;
       mAccessQueueBlock.add(new Pair<Long, Long>(blockId, length));
+      mAccessTimeBlock.put(blockId, length);
       mBlockQueueLength += length;
     } catch (FileDoesNotExistException e) {
       MasterInfo.getLog().error(e.getMessage());

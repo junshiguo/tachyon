@@ -30,10 +30,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.mapred.TaskLog.LogName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -306,6 +308,12 @@ public class WorkerStorage {
   /** Mapping from user id to ids of temporary blocks which are being written by the user */
   private final Multimap<Long, Long> mUserIdToTempBlockIds =
       Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
+  /**
+   * Mapping from file id to used memory space. This is newly added!!! Updated in
+   * {@link tachyon.worker.hierarchy.StorageDir#addBlockId} and
+   * {@link tachyon.worker.hierarchy.StorageDir#deleteBlockId}
+   */
+  private Map<Integer, Long> mFileDistribution = new ConcurrentHashMap<>();
 
   /**
    * Main logic behind the worker process.
@@ -855,11 +863,10 @@ public class WorkerStorage {
     try {
       if (dirCandidate == null) {
         // if StorageDir candidate is not set, request space from all available StorageDirs
-        dir = mStorageTiers.get(0).requestSpace(userId, requestBytes, pinList, removedBlockIds,
-            requestBlockId);
+        dir = mStorageTiers.get(0).requestSpace(userId, requestBytes, pinList, removedBlockIds);
       } else { // request space from the StorageDir specified
         if (mStorageTiers.get(0).requestSpace(dirCandidate, userId, requestBytes, pinList,
-            removedBlockIds, requestBlockId)) {
+            removedBlockIds)) {
           dir = dirCandidate;
         }
       }
@@ -1028,5 +1035,44 @@ public class WorkerStorage {
   public BlockInfo getBlockInfo(WorkerBlockInfo workerBlockInfo) {
     return new BlockInfo(getStorageDirByDirId(workerBlockInfo.storageDirId),
         workerBlockInfo.blockId, workerBlockInfo.blockSize);
+  }
+
+  /**
+   * called by {@link tachyon.worker.hierarchy.StorageDir#addBlockId} and
+   * {@link tachyon.worker.hierarchy.StorageDir#deleteBlockId}
+   * 
+   * @param fileId
+   * @param diff
+   */
+  public void updateFileDistribution(int fileId, long diff) {
+    synchronized (mFileDistribution) {
+      if (mFileDistribution.containsKey(fileId)) {
+        long value = mFileDistribution.get(fileId) + diff;
+        if (value > 0) {
+          mFileDistribution.put(fileId, value);
+        } else {
+          mFileDistribution.remove(fileId);
+        }
+      }
+    }
+  }
+
+  public Map<Integer, Long> getFileDistributionClone() {
+    return new HashMap<>(mFileDistribution);
+  }
+
+  public void setFileDistribution(Map<Integer, Long> newDistribution) {
+    synchronized (mFileDistribution) {
+      mFileDistribution = newDistribution;
+    }
+  }
+
+  public Map<Integer, Long> getMemAllocationPlan() {
+    try {
+      return mMasterClient.worker_getMemAllocationPlan();
+    } catch (IOException e) {
+      LOG.error(e.getMessage());
+    }
+    return null;
   }
 }

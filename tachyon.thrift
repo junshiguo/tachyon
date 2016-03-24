@@ -279,7 +279,7 @@ service MasterService {
 
   void user_accessFile(1: i32 fileId)
 
-  void user_accessBlock(1: i64 blockId)
+  map<i32, i64> worker_getMemAllocationPlan()
 }
 
 service WorkerService {

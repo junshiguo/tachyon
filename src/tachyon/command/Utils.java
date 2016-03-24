@@ -58,8 +58,8 @@ public class Utils {
   public static String validatePath(String path) throws IOException {
     if (path.startsWith(Constants.HEADER) || path.startsWith(Constants.HEADER_FT)) {
       if (!path.contains(":")) {
-        throw new IOException("Invalid Path: " + path + ". Use " + Constants.HEADER
-            + "host:port/ ," + Constants.HEADER_FT + "host:port/" + " , or /file");
+        throw new IOException("Invalid Path: " + path + ". Use " + Constants.HEADER + "host:port/ ,"
+            + Constants.HEADER_FT + "host:port/" + " , or /file");
       } else {
         return path;
       }

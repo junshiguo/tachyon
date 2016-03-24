@@ -59,8 +59,8 @@ public class RemoteBlockInStream extends BlockInStream {
   private long mCheckpointPos = -1;
 
   /**
-   * The position in the block we are currently at, relative to the block. The
-   * position relative to the file would be mBlockInfo.offset + mBlockPos.
+   * The position in the block we are currently at, relative to the block. The position relative to
+   * the file would be mBlockInfo.offset + mBlockPos.
    */
   private long mBlockPos = 0;
 
@@ -227,8 +227,8 @@ public class RemoteBlockInStream extends BlockInStream {
       // We failed to read everything from mCurrentBuffer, so we need to stream the rest from the
       // underfs
       if (!setupStreamFromUnderFs()) {
-        LOG.error("Failed to read at position " + mBlockPos + " in block "
-            + mBlockInfo.getBlockId() + " from workers or underfs");
+        LOG.error("Failed to read at position " + mBlockPos + " in block " + mBlockInfo.getBlockId()
+            + " from workers or underfs");
         // Return the number of bytes we managed to read
         return len - bytesLeft;
       }
@@ -276,16 +276,14 @@ public class RemoteBlockInStream extends BlockInStream {
             + NetworkUtils.getLocalIpAddress());
 
         try {
-          buf =
-              retrieveByteBufferFromRemoteMachine(new InetSocketAddress(host, port),
-                  blockInfo.blockId, offset, len);
+          buf = retrieveByteBufferFromRemoteMachine(new InetSocketAddress(host, port),
+              blockInfo.blockId, offset, len);
           if (buf != null) {
             break;
           }
         } catch (IOException e) {
-          LOG.error("Fail to retrieve byte buffer for block " + blockInfo.blockId
-              + " from remote " + host + ":" + port + " with offset " + offset + " and length "
-              + len, e);
+          LOG.error("Fail to retrieve byte buffer for block " + blockInfo.blockId + " from remote "
+              + host + ":" + port + " with offset " + offset + " and length " + len, e);
           buf = null;
         }
       }
@@ -342,8 +340,8 @@ public class RemoteBlockInStream extends BlockInStream {
     if (pos < 0) {
       throw new IOException("Seek position is negative: " + pos);
     } else if (pos > mBlockInfo.length) {
-      throw new IOException("Seek position is past block size: " + pos + ", Block Size = "
-          + mBlockInfo.length);
+      throw new IOException(
+          "Seek position is past block size: " + pos + ", Block Size = " + mBlockInfo.length);
     } else if (pos == mBlockPos) {
       // There's nothing to do
       return;
@@ -371,8 +369,8 @@ public class RemoteBlockInStream extends BlockInStream {
       mCheckpointInputStream = underfsClient.open(checkpointPath);
       // We skip to the offset of the block in the file, so we're at the beginning of the block.
       if (mCheckpointInputStream.skip(mBlockInfo.offset) != mBlockInfo.offset) {
-        throw new IOException("Failed to skip to the block offset " + mBlockInfo.offset
-            + " in the checkpoint file");
+        throw new IOException(
+            "Failed to skip to the block offset " + mBlockInfo.offset + " in the checkpoint file");
       }
       mCheckpointPos = 0;
     }
@@ -380,8 +378,8 @@ public class RemoteBlockInStream extends BlockInStream {
     while (mCheckpointPos < mBlockPos) {
       long skipped = mCheckpointInputStream.skip(mBlockPos - mCheckpointPos);
       if (skipped <= 0) {
-        throw new IOException("Failed to skip to the position " + mBlockPos + " for block "
-            + mBlockInfo);
+        throw new IOException(
+            "Failed to skip to the position " + mBlockPos + " for block " + mBlockInfo);
       }
       mCheckpointPos += skipped;
     }
@@ -401,10 +399,9 @@ public class RemoteBlockInStream extends BlockInStream {
   }
 
   /**
-   * Makes sure mCurrentBuffer is set to read at mBlockPos. If it is already, we do
-   * nothing. Otherwise, we set mBufferStartPos accordingly and try to read the correct range of
-   * bytes remotely. If we fail to read remotely, mCurrentBuffer will be null at the end of the
-   * function
+   * Makes sure mCurrentBuffer is set to read at mBlockPos. If it is already, we do nothing.
+   * Otherwise, we set mBufferStartPos accordingly and try to read the correct range of bytes
+   * remotely. If we fail to read remotely, mCurrentBuffer will be null at the end of the function
    * 
    * @return true if mCurrentBuffer was successfully set to read at mBlockPos, or false if the
    *         remote read failed.
@@ -422,8 +419,8 @@ public class RemoteBlockInStream extends BlockInStream {
     // be the one at mBlockPos
     mBufferStartPos = mBlockPos;
     long length = Math.min(BUFFER_SIZE, mBlockInfo.length - mBufferStartPos);
-    LOG.info("Try to find remote worker and read block {} from {}, with len {}",
-        mBlockInfo.blockId, mBufferStartPos, length);
+    LOG.info("Try to find remote worker and read block {} from {}, with len {}", mBlockInfo.blockId,
+        mBufferStartPos, length);
 
     for (int i = 0; i < MAX_REMOTE_READ_ATTEMPTS; i ++) {
       mCurrentBuffer = readRemoteByteBuffer(mTachyonFS, mBlockInfo, mBufferStartPos, length);

@@ -64,7 +64,7 @@ public class WorkerConf extends Utils {
   public final int WORKER_PER_THREAD_CHECKPOINT_CAP_MB_SEC;
 
   public final NetworkType NETWORK_TYPE;
-  
+
   public final String KEYTAB_KEY;
   public final String KEYTAB;
   public final String PRINCIPAL_KEY;
@@ -96,9 +96,8 @@ public class WorkerConf extends Utils {
     DATA_PORT =
         getIntProperty("tachyon.worker.data.port", Constants.DEFAULT_WORKER_DATA_SERVER_PORT);
     DATA_FOLDER = getProperty("tachyon.worker.data.folder", "/datastore");
-    MEMORY_SIZE =
-        CommonUtils.parseSpaceSize(getProperty("tachyon.worker.memory.size", (128 * Constants.MB)
-            + ""));
+    MEMORY_SIZE = CommonUtils
+        .parseSpaceSize(getProperty("tachyon.worker.memory.size", (128 * Constants.MB) + ""));
     HEARTBEAT_TIMEOUT_MS =
         getIntProperty("tachyon.worker.heartbeat.timeout.ms", 10 * Constants.SECOND_MS);
     TO_MASTER_HEARTBEAT_INTERVAL_MS =
@@ -112,7 +111,7 @@ public class WorkerConf extends Utils {
     WORKER_CHECKPOINT_THREADS = getIntProperty("tachyon.worker.checkpoint.threads", 1);
     WORKER_PER_THREAD_CHECKPOINT_CAP_MB_SEC =
         getIntProperty("tachyon.worker.per.thread.checkpoint.cap.mb.sec", Constants.SECOND_MS);
-    
+
     KEYTAB_KEY = "tachyon.worker.keytab.file";
     KEYTAB = getProperty(KEYTAB_KEY, null);
     PRINCIPAL_KEY = "tachyon.worker.principal";
@@ -132,9 +131,8 @@ public class WorkerConf extends Utils {
         Optional.fromNullable(getIntegerProperty("tachyon.worker.network.netty.backlog", null));
     NETTY_SEND_BUFFER =
         Optional.fromNullable(getIntegerProperty("tachyon.worker.network.netty.buffer.send", null));
-    NETTY_RECIEVE_BUFFER =
-        Optional.fromNullable(getIntegerProperty("tachyon.worker.network.netty.buffer.receive",
-            null));
+    NETTY_RECIEVE_BUFFER = Optional
+        .fromNullable(getIntegerProperty("tachyon.worker.network.netty.buffer.receive", null));
 
     EVICT_STRATEGY_TYPE = getEnumProperty("tachyon.worker.evict.strategy", EvictStrategyType.LRU);
     ALLOCATE_STRATEGY_TYPE =
@@ -144,13 +142,11 @@ public class WorkerConf extends Utils {
     STORAGE_TIER_DIRS = new String[STORAGE_LEVELS];
     STORAGE_TIER_DIR_QUOTA = new String[STORAGE_LEVELS];
     for (int i = 0; i < STORAGE_LEVELS; i ++) {
-      STORAGE_LEVEL_ALIAS[i] =
-          getEnumProperty("tachyon.worker.hierarchystore.level" + i + ".alias",
-              StorageLevelAlias.MEM);
+      STORAGE_LEVEL_ALIAS[i] = getEnumProperty("tachyon.worker.hierarchystore.level" + i + ".alias",
+          StorageLevelAlias.MEM);
       if (STORAGE_LEVEL_ALIAS[i].equals(StorageLevelAlias.MEM)) {
-        STORAGE_TIER_DIR_QUOTA[i] =
-            getProperty("tachyon.worker.hierarchystore.level" + i + ".dirs.quota",
-                MEMORY_SIZE + "");
+        STORAGE_TIER_DIR_QUOTA[i] = getProperty(
+            "tachyon.worker.hierarchystore.level" + i + ".dirs.quota", MEMORY_SIZE + "");
         STORAGE_TIER_DIRS[i] =
             getProperty("tachyon.worker.hierarchystore.level" + i + ".dirs.path", "/mnt/ramdisk");
       } else {

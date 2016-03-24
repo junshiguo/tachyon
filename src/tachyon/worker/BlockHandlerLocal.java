@@ -99,9 +99,8 @@ public final class BlockHandlerLocal extends BlockHandler {
     if (offset > fileLength) {
       error = String.format("offset(%d) is larger than file length(%d)", offset, fileLength);
     } else if (length != -1 && offset + length > fileLength) {
-      error =
-          String.format("offset(%d) plus length(%d) is larger than file length(%d)", offset,
-              length, fileLength);
+      error = String.format("offset(%d) plus length(%d) is larger than file length(%d)", offset,
+          length, fileLength);
     }
     if (error != null) {
       throw new IOException(error);

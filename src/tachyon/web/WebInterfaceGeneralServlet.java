@@ -84,11 +84,8 @@ public class WebInterfaceGeneralServlet extends HttpServlet {
 
     request.setAttribute("masterNodeAddress", mMasterInfo.getMasterAddress().toString());
 
-    request
-        .setAttribute(
-            "uptime",
-            CommonUtils.convertMsToClockTime(System.currentTimeMillis()
-                - mMasterInfo.getStarttimeMs()));
+    request.setAttribute("uptime", CommonUtils
+        .convertMsToClockTime(System.currentTimeMillis() - mMasterInfo.getStarttimeMs()));
 
     request.setAttribute("startTime", CommonUtils.convertMsToDate(mMasterInfo.getStarttimeMs()));
 
@@ -100,10 +97,8 @@ public class WebInterfaceGeneralServlet extends HttpServlet {
 
     request.setAttribute("usedCapacity", CommonUtils.getSizeFromBytes(mMasterInfo.getUsedBytes()));
 
-    request
-        .setAttribute("freeCapacity",
-            CommonUtils.getSizeFromBytes((mMasterInfo.getCapacityBytes() - mMasterInfo
-                .getUsedBytes())));
+    request.setAttribute("freeCapacity", CommonUtils
+        .getSizeFromBytes((mMasterInfo.getCapacityBytes() - mMasterInfo.getUsedBytes())));
 
     long sizeBytes = mMasterInfo.getUnderFsCapacityBytes();
     if (sizeBytes >= 0) {

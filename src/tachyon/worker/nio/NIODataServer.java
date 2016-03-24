@@ -55,10 +55,10 @@ public class NIODataServer implements Runnable, DataServer {
   // The selector we will be monitoring.
   private Selector mSelector;
 
-  private final Map<SocketChannel, DataServerMessage> mSendingData = Collections
-      .synchronizedMap(new HashMap<SocketChannel, DataServerMessage>());
-  private final Map<SocketChannel, DataServerMessage> mReceivingData = Collections
-      .synchronizedMap(new HashMap<SocketChannel, DataServerMessage>());
+  private final Map<SocketChannel, DataServerMessage> mSendingData =
+      Collections.synchronizedMap(new HashMap<SocketChannel, DataServerMessage>());
+  private final Map<SocketChannel, DataServerMessage> mReceivingData =
+      Collections.synchronizedMap(new HashMap<SocketChannel, DataServerMessage>());
 
   // The blocks locker manager.
   private final BlocksLocker mBlockLocker;
@@ -217,16 +217,15 @@ public class NIODataServer implements Runnable, DataServer {
       ByteBuffer data;
       int dataLen = 0;
       try {
-        data = storageDir.getBlockData(blockId, tMessage.getOffset(), (int)tMessage.getLength());
+        data = storageDir.getBlockData(blockId, tMessage.getOffset(), (int) tMessage.getLength());
         storageDir.accessBlock(blockId);
         dataLen = data.limit();
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
         data = null;
       }
-      DataServerMessage tResponseMessage =
-          DataServerMessage.createBlockResponseMessage(true, blockId, tMessage.getOffset(),
-              dataLen, data);
+      DataServerMessage tResponseMessage = DataServerMessage.createBlockResponseMessage(true,
+          blockId, tMessage.getOffset(), dataLen, data);
       tResponseMessage.setLockId(lockId);
       mSendingData.put(socketChannel, tResponseMessage);
     }

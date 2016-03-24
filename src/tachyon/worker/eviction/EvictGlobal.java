@@ -6,10 +6,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
 
 import tachyon.Pair;
 import tachyon.StorageDirId;
-import tachyon.thrift.MasterService.AsyncProcessor.liststatus;
 import tachyon.thrift.WorkerBlockInfo;
 import tachyon.worker.WorkerStorage;
 import tachyon.worker.hierarchy.BlockInfo;
@@ -26,6 +26,53 @@ public class EvictGlobal implements EvictStrategy {
 
   @Override
   public Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
+      Set<Integer> pinList, long requestBytes) {
+    Map<Integer, Long> memAllocation = mWorkerStorage.getMemAllocationPlan();
+    if (memAllocation == null) {
+      return null;
+    }
+    Pair<StorageDir, List<BlockInfo>> dirCandidate = null;
+    for (StorageDir dir : storageDirs) {
+      dirCandidate = getDirCandidate(memAllocation, dir, pinList, requestBytes);
+      if (dirCandidate != null) {
+        return dirCandidate;
+      }
+    }
+    return null;
+  }
+
+  private Pair<StorageDir, List<BlockInfo>> getDirCandidate(Map<Integer, Long> memAllocation,
+      StorageDir curDir, Set<Integer> pinList, long requestBytes) {
+    Map<Integer, Long> fileDistribution = mWorkerStorage.getFileDistributionClone();
+    Set<Entry<Long, Long>> blocks = curDir.getBlockSizes();
+    long mem = curDir.getAvailableBytes();
+    List<BlockInfo> toEvictBlocks = new ArrayList<>();
+    for (Entry<Long, Long> entry : blocks) {
+      long blockId = entry.getKey();
+      long blockSize = entry.getValue();
+      int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
+      Long fileConsumption = fileDistribution.get(fileId);
+      if (fileConsumption > memAllocation.get(fileId)) {
+        mem += curDir.getBlockSize(blockSize);
+        toEvictBlocks.add(new BlockInfo(curDir, blockId, blockSize));
+        fileConsumption -= blockSize;
+        if (fileConsumption > 0) {
+          fileDistribution.put(fileId, fileConsumption);
+        } else {
+          fileDistribution.remove(fileId);
+        }
+      }
+
+      if (mem >= requestBytes) {
+        mWorkerStorage.setFileDistribution(fileDistribution);
+        return new Pair<StorageDir, List<BlockInfo>>(curDir, toEvictBlocks);
+      }
+    }
+    return null;
+  }
+
+  @Deprecated
+  public Pair<StorageDir, List<BlockInfo>> getDirCandidate_masterSide(StorageDir[] storageDirs,
       Set<Integer> pinList, long requestBytes, long requestBlockId) {
     List<Long> lockedBlocks = new ArrayList<>();
     List<Long> storageDirIds = new ArrayList<>();

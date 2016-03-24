@@ -66,7 +66,7 @@ public class WorkerClient implements Closeable {
   protected boolean mIsLocal = false;
   protected final ExecutorService mExecutorService;
   protected Future<?> mHeartbeat;
-  
+
   /**
    * Create a WorkerClient, with a given MasterClient.
    * 
@@ -243,9 +243,8 @@ public class WorkerClient implements Closeable {
       HeartbeatExecutor heartBeater =
           new WorkerClientHeartbeatExecutor(this, mMasterClient.getUserId());
       String threadName = "worker-heartbeat-" + mWorkerAddress;
-      mHeartbeat =
-          mExecutorService.submit(new HeartbeatThread(threadName, heartBeater,
-              UserConf.get().HEARTBEAT_INTERVAL_MS));
+      mHeartbeat = mExecutorService.submit(
+          new HeartbeatThread(threadName, heartBeater, UserConf.get().HEARTBEAT_INTERVAL_MS));
 
       try {
         mProtocol.getTransport().open();
@@ -440,5 +439,5 @@ public class WorkerClient implements Closeable {
       throw new IOException(e);
     }
   }
-  
+
 }

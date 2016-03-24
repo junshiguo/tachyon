@@ -360,7 +360,7 @@ public class MasterInfo extends ImageWriter {
   private final Map<Integer, Inode> mFileIdToInodes = new HashMap<Integer, Inode>();
   private final Map<Integer, Dependency> mFileIdToDependency = new HashMap<Integer, Dependency>();
   private final RawTables mRawTables = new RawTables();
-  private final EvictGlobal mEvictGlobal = new EvictGlobal(this);
+  private final EvictGlobalInfo mEvictGlobalInfo = new EvictGlobalInfo(this);
 
   // TODO add initialization part for master failover or restart. All operations on these members
   // are synchronized on mFileIdToDependency.
@@ -1007,6 +1007,14 @@ public class MasterInfo extends ImageWriter {
    */
   private void addToInodeMap(Inode inode, Map<Integer, Inode> map) {
     map.put(inode.getId(), inode);
+    if (inode.isFile()) {
+      InodeFile file = (InodeFile) inode;
+      List<BlockInfo> blocks = file.getBlockList();
+      for (BlockInfo blockInfo : blocks) {
+        // blockInfo.getBlockIdWorkerIdPairs()
+
+      }
+    }
     if (inode.isDirectory()) {
       InodeFolder inodeFolder = (InodeFolder) inode;
       for (Inode child : inodeFolder.getChildren()) {
@@ -1875,7 +1883,7 @@ public class MasterInfo extends ImageWriter {
    * @param workerId The id of the worker to look at
    * @return the info about the worker
    */
-  private MasterWorkerInfo getWorkerInfo(long workerId) {
+  public MasterWorkerInfo getWorkerInfo(long workerId) {
     MasterWorkerInfo ret = null;
     synchronized (mWorkers) {
       ret = mWorkers.get(workerId);
@@ -2599,16 +2607,17 @@ public class MasterInfo extends ImageWriter {
   public synchronized Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(
       NetAddress workerAddress, Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId,
       long requestBytes, boolean isLastTier) {
-    return mEvictGlobal.getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds, blockId,
-        requestBytes, isLastTier);
+    // return mEvictGlobal.getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds, blockId,
+    // requestBytes, isLastTier);
+    return null;
   }
 
   public synchronized void accessFile(int fileId) {
-    mEvictGlobal.accessFile(fileId);
+    mEvictGlobalInfo.accessFile(fileId);
   }
 
-  public synchronized void accessBlock(long blockId) {
-    mEvictGlobal.accessBlock(blockId);
+  public synchronized Map<Integer, Long> worker_getMemAllocationPlan() {
+    return mEvictGlobalInfo.getMemAllocationPlan();
   }
 
   public Map<Integer, Inode> getmFileIdToInodes() {

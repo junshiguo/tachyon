@@ -75,8 +75,8 @@ public final class BlockResponse {
             }
             break;
           default:
-            throw new AssertionError("Unknown file transfer type: "
-                + WorkerConf.get().NETTY_FILE_TRANSFER_TYPE);
+            throw new AssertionError(
+                "Unknown file transfer type: " + WorkerConf.get().NETTY_FILE_TRANSFER_TYPE);
         }
       }
     }

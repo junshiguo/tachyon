@@ -860,16 +860,18 @@ public final class MasterClient implements Closeable {
     }
   }
 
-  public synchronized void user_accessBlock(long blockId) throws IOException {
+  public synchronized Map<Integer, Long> worker_getMemAllocationPlan() throws IOException {
     while (!mIsShutdown) {
       connect();
 
       try {
-        mClient.user_accessBlock(blockId);
+        return mClient.worker_getMemAllocationPlan();
       } catch (TException e) {
         LOG.error(e.getMessage(), e);
         mConnected = false;
       }
     }
+    return null;
   }
+
 }

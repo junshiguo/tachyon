@@ -66,8 +66,8 @@ public class WorkerServiceHandler implements WorkerService.Iface {
   }
 
   @Override
-  public void cacheBlock(long userId, long blockId) throws FileDoesNotExistException,
-      SuspectedFileSizeException, BlockInfoException, TException {
+  public void cacheBlock(long userId, long blockId)
+      throws FileDoesNotExistException, SuspectedFileSizeException, BlockInfoException, TException {
     try {
       mWorkerStorage.cacheBlock(userId, blockId);
     } catch (IOException e) {
@@ -123,7 +123,8 @@ public class WorkerServiceHandler implements WorkerService.Iface {
   }
 
   @Override
-  public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos) throws TException {
+  public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos)
+      throws TException {
     return mWorkerStorage.master_cacheFromRemote(userId, blockInfos);
   }
 

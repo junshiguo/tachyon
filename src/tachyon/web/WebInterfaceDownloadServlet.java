@@ -95,9 +95,8 @@ public class WebInterfaceDownloadServlet extends HttpServlet {
    */
   private void downloadFile(TachyonURI path, HttpServletRequest request,
       HttpServletResponse response) throws FileDoesNotExistException, IOException {
-    String masterAddress =
-        Constants.HEADER + mMasterInfo.getMasterAddress().getHostName() + ":"
-            + mMasterInfo.getMasterAddress().getPort();
+    String masterAddress = Constants.HEADER + mMasterInfo.getMasterAddress().getHostName() + ":"
+        + mMasterInfo.getMasterAddress().getPort();
     TachyonFS tachyonClient = TachyonFS.get(new TachyonURI(masterAddress));
     TachyonFile tFile = tachyonClient.getFile(path);
     if (tFile == null) {

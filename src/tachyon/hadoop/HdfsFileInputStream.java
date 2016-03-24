@@ -66,8 +66,8 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     mHadoopBufferSize = bufferSize;
     mTachyonFile = mTFS.getFile(mFileId);
     if (mTachyonFile == null) {
-      throw new FileNotFoundException("File " + hdfsPath + " with FID " + fileId
-          + " is not found.");
+      throw new FileNotFoundException(
+          "File " + hdfsPath + " with FID " + fileId + " is not found.");
     }
     mTachyonFile.setUFSConf(mHadoopConf);
     try {
@@ -236,8 +236,8 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     if (pos < 0) {
       throw new IllegalArgumentException("Seek position is negative: " + pos);
     } else if (pos > mTachyonFile.length()) {
-      throw new IllegalArgumentException("Seek position is past EOF: " + pos + ", fileSize = "
-          + mTachyonFile.length());
+      throw new IllegalArgumentException(
+          "Seek position is past EOF: " + pos + ", fileSize = " + mTachyonFile.length());
     }
 
     if (mTachyonFileInputStream != null) {

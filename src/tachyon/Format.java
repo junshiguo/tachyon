@@ -66,8 +66,8 @@ public class Format {
         System.exit(-1);
       }
 
-      CommonUtils.touch(masterConf.JOURNAL_FOLDER + masterConf.FORMAT_FILE_PREFIX
-          + System.currentTimeMillis());
+      CommonUtils.touch(
+          masterConf.JOURNAL_FOLDER + masterConf.FORMAT_FILE_PREFIX + System.currentTimeMillis());
     } else if (args[0].toUpperCase().equals("WORKER")) {
       WorkerConf workerConf = WorkerConf.get();
       for (int level = 0; level < workerConf.STORAGE_LEVELS; level ++) {

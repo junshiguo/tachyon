@@ -187,10 +187,9 @@ public class RawTables extends ImageWriter {
       data.add(entry.getValue().getSecond());
     }
 
-    ImageElement ele =
-        new ImageElement(ImageElementType.RawTable).withParameter("ids", ids)
-            .withParameter("columns", columns)
-            .withParameter("data", Utils.byteBufferListToBase64(data));
+    ImageElement ele = new ImageElement(ImageElementType.RawTable).withParameter("ids", ids)
+        .withParameter("columns", columns)
+        .withParameter("data", Utils.byteBufferListToBase64(data));
 
     writeElement(objWriter, dos, ele);
   }

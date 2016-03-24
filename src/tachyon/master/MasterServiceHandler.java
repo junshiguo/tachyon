@@ -332,15 +332,15 @@ public class MasterServiceHandler implements MasterService.Iface {
   }
 
   @Override
-  public void user_accessBlock(long blockId) throws TException {
-    mMasterInfo.accessBlock(blockId);
-  }
-
-  @Override
   public Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(NetAddress workerAddress,
       Set<Long> lockedBlocks, List<Long> candidateDir, long blockId, long requestBytes,
       boolean isLastTier) throws TException {
     return mMasterInfo.worker_getBlocksToEvict(workerAddress, lockedBlocks, candidateDir, blockId,
         requestBytes, isLastTier);
+  }
+
+  @Override
+  public Map<Integer, Long> worker_getMemAllocationPlan() throws TException {
+    return mMasterInfo.worker_getMemAllocationPlan();
   }
 }

@@ -40,18 +40,19 @@ public class UfsUtils {
   /**
    * Build a new path relative to a given mTachyonFS root by retrieving the given path relative to
    * the ufsRootPath.
+   * 
    * @param tfsRootPath the destination point in mTachyonFS to load the under FS path onto
    * @param ufsRootPath the source path in the under FS to be loaded
    * @param path the path in the under FS be loaded, path.startsWith(ufsRootPath) must be true
    * @return the new path relative to tfsRootPath.
    */
-  private static TachyonURI buildTFSPath(
-      TachyonURI tfsRootPath, TachyonURI ufsRootPath, TachyonURI path) {
+  private static TachyonURI buildTFSPath(TachyonURI tfsRootPath, TachyonURI ufsRootPath,
+      TachyonURI path) {
     String filePath = path.getPath().substring(ufsRootPath.getPath().length());
     if (filePath.isEmpty()) {
       // retrieve the basename in ufsRootPath
-      filePath = path.getPath().substring(
-          ufsRootPath.getPath().lastIndexOf(TachyonURI.SEPARATOR) + 1);
+      filePath =
+          path.getPath().substring(ufsRootPath.getPath().lastIndexOf(TachyonURI.SEPARATOR) + 1);
     }
     return new TachyonURI(CommonUtils.concat(tfsRootPath, filePath));
   }
@@ -157,8 +158,8 @@ public class UfsUtils {
           }
         }
         // ufsPath is a directory, so only concat the tfsRoot with the relative path
-        TachyonURI tfsPath = new TachyonURI(CommonUtils.concat(
-            tachyonPath, ufsPath.getPath().substring(ufsAddrRootPath.getPath().length())));
+        TachyonURI tfsPath = new TachyonURI(CommonUtils.concat(tachyonPath,
+            ufsPath.getPath().substring(ufsAddrRootPath.getPath().length())));
         if (!tfs.exist(tfsPath)) {
           tfs.mkdir(tfsPath);
           // TODO Add the following.
@@ -193,9 +194,8 @@ public class UfsUtils {
   }
 
   public static void printUsage() {
-    String cmd =
-        "java -cp target/tachyon-" + Version.VERSION + "-jar-with-dependencies.jar "
-            + "tachyon.util.UfsUtils ";
+    String cmd = "java -cp target/tachyon-" + Version.VERSION + "-jar-with-dependencies.jar "
+        + "tachyon.util.UfsUtils ";
 
     System.out.println("Usage: " + cmd + "<TachyonPath> <UfsPath> "
         + "[<Optional ExcludePathPrefix, separated by ;>]");
