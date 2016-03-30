@@ -315,7 +315,7 @@ public class MasterServiceHandler implements MasterService.Iface {
   }
 
   @Override
-  public List<Command> worker_heartbeat(long workerId, long usedBytes, List<Long> removedBlockIds,
+  public Command worker_heartbeat(long workerId, long usedBytes, List<Long> removedBlockIds,
       Map<Long, List<Long>> addedBlockIds) throws BlockInfoException, TException {
     return mMasterInfo.workerHeartbeat(workerId, usedBytes, removedBlockIds, addedBlockIds);
   }
@@ -329,14 +329,6 @@ public class MasterServiceHandler implements MasterService.Iface {
   @Override
   public void user_accessFile(int fileId) throws TException {
     mMasterInfo.accessFile(fileId);
-  }
-
-  @Override
-  public Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(NetAddress workerAddress,
-      Set<Long> lockedBlocks, List<Long> candidateDir, long blockId, long requestBytes,
-      boolean isLastTier) throws TException {
-    return mMasterInfo.worker_getBlocksToEvict(workerAddress, lockedBlocks, candidateDir, blockId,
-        requestBytes, isLastTier);
   }
 
   @Override

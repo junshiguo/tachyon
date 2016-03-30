@@ -655,7 +655,7 @@ public class WorkerStorage {
    * @return The Command received from the Master
    * @throws IOException
    */
-  public List<Command> heartbeat() throws IOException {
+  public Command heartbeat() throws IOException {
     List<Long> removedBlockIds = new ArrayList<Long>();
     Map<Long, List<Long>> addedBlockIds = new HashMap<Long, List<Long>>();
 
@@ -1015,13 +1015,6 @@ public class WorkerStorage {
       }
     }
     return ret;
-  }
-
-  public Map<Long, List<WorkerBlockInfo>> getBlocksToEvict(NetAddress workerAddress,
-      Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId, long requestBytes,
-      boolean isLastTier) throws IOException {
-    return mMasterClient.worker_getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds,
-        blockId, requestBytes, isLastTier);
   }
 
   public NetAddress getmWorkerAddress() {

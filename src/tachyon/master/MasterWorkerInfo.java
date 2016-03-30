@@ -48,8 +48,6 @@ public class MasterWorkerInfo {
   private Set<Long> mBlocks;
   /** IDs of blocks the worker should remove **/
   private Set<Long> mToRemoveBlocks;
-  /** IDs of blocks the worker should cache from remote; newly added **/
-  private Set<Long> mToCacheBlocks;
 
   public MasterWorkerInfo(long id, NetAddress address, long capacityBytes) {
     mId = id;
@@ -60,7 +58,6 @@ public class MasterWorkerInfo {
     mUsedBytes = 0;
     mBlocks = new HashSet<Long>();
     mToRemoveBlocks = new HashSet<Long>();
-    mToCacheBlocks = new HashSet<Long>();
     mLastUpdatedTimeMs = System.currentTimeMillis();
   }
 
@@ -127,10 +124,6 @@ public class MasterWorkerInfo {
    */
   public synchronized List<Long> getToRemovedBlocks() {
     return new ArrayList<Long>(mToRemoveBlocks);
-  }
-
-  public synchronized List<Long> getToCachedBlocks() {
-    return new ArrayList<Long>(mToCacheBlocks);
   }
 
   /**
@@ -217,34 +210,6 @@ public class MasterWorkerInfo {
   public synchronized void updateToRemovedBlocks(boolean add, Collection<Long> blockIds) {
     for (long blockId : blockIds) {
       updateToRemovedBlock(add, blockId);
-    }
-  }
-
-  /**
-   * Adds or removes a block from the to-be-cached blocks set of the worker.
-   * 
-   * @param add
-   * @param blockId
-   */
-  public synchronized void updateToCachedBlock(boolean add, long blockId) {
-    if (add) {
-      if (mBlocks.contains(blockId) == false) {
-        mToCacheBlocks.add(blockId);
-      }
-    } else {
-      mToCacheBlocks.remove(blockId);
-    }
-  }
-
-  /**
-   * Adds or removes blocks from the to-be-cached set of the worker.
-   * 
-   * @param add
-   * @param blockIds
-   */
-  public synchronized void updateToCachedBlocks(boolean add, Collection<Long> blockIds) {
-    for (long blockId : blockIds) {
-      updateToCachedBlock(add, blockId);
     }
   }
 

@@ -484,6 +484,11 @@ public class TachyonFS extends AbstractTachyonFS {
     if (clientFileInfo == null) {
       return null;
     }
+    System.out.println("TachyonFS.getFile(fid, useCachedMetadata: get ClientInfo done!\n"
+        + clientFileInfo.isFolder);
+    if (!clientFileInfo.isFolder) {
+      mMasterClient.user_accessFile(clientFileInfo.getId());
+    }
     return new TachyonFile(this, fid);
   }
 
@@ -529,10 +534,23 @@ public class TachyonFS extends AbstractTachyonFS {
       throws IOException {
     validateUri(path);
     ClientFileInfo clientFileInfo = getFileStatus(-1, path, useCachedMetadata);
+    System.out.println("TachyonFS.getFile: get ClientFileInfo done");
     if (clientFileInfo == null) {
       return null;
     }
+    System.out.println(clientFileInfo.isFolder);
+    // if (!clientFileInfo.isFolder) {
+    // mMasterClient.user_accessFile(clientFileInfo.getId());
+    // }
     return new TachyonFile(this, clientFileInfo.getId());
+  }
+
+  public synchronized boolean accessFile(TachyonURI path) throws IOException {
+    validateUri(path);
+    ClientFileInfo clientFileInfo = getFileStatus(-1, path, false);
+//    System.out.println("TachyonFS.accessFile: fileid = " + clientFileInfo.getId());
+    mMasterClient.user_accessFile(clientFileInfo.getId());
+    return true;
   }
 
   /**

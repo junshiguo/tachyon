@@ -20,6 +20,7 @@ import java.util.Arrays;
 
 import tachyon.Constants;
 import tachyon.TachyonURI;
+import tachyon.util.CommonUtils;
 import tachyon.util.NetworkUtils;
 
 /**
@@ -64,6 +65,8 @@ public class MasterConf extends Utils {
   public final String PRINCIPAL_KEY;
   public final String PRINCIPAL;
 
+  public final long MEMORY_QUEUE_SIZE;
+
   public final ArrayList<String> WHITELIST = new ArrayList<String>();
 
   private MasterConf() {
@@ -104,5 +107,8 @@ public class MasterConf extends Utils {
       System.err.println("WARNING: tachyon.master.pinlist is set but no longer supported!"
           + " Please use the pin function in the TFS Shell instead.");
     }
+
+    MEMORY_QUEUE_SIZE = CommonUtils
+        .parseSpaceSize(getProperty("tachyon.master.memory.queue.size", (100 * Constants.GB) + ""));
   }
 }

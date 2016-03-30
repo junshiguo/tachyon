@@ -780,7 +780,7 @@ public final class MasterClient implements Closeable {
     return new ArrayList<Integer>();
   }
 
-  public synchronized List<Command> worker_heartbeat(long workerId, long usedBytes,
+  public synchronized Command worker_heartbeat(long workerId, long usedBytes,
       List<Long> removedBlockIds, Map<Long, List<Long>> addedBlockIds) throws IOException {
     while (!mIsShutdown) {
       connect();
@@ -830,32 +830,18 @@ public final class MasterClient implements Closeable {
     return -1;
   }
 
-  public synchronized Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(
-      NetAddress workerAddress, Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId,
-      long requestBytes, boolean isLastTier) throws IOException {
-    while (!mIsShutdown) {
-      connect();
-
-      try {
-        return mClient.worker_getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds,
-            blockId, requestBytes, isLastTier);
-      } catch (TException e) {
-        LOG.error(e.getMessage(), e);
-        mConnected = false;
-      }
-    }
-    return null;
-  }
-
   public synchronized void user_accessFile(int fileId) throws IOException {
     while (!mIsShutdown) {
       connect();
 
       try {
         mClient.user_accessFile(fileId);
+        return;
       } catch (TException e) {
         LOG.error(e.getMessage(), e);
+        System.out.println(e.getMessage());
         mConnected = false;
+        break;
       }
     }
   }

@@ -255,7 +255,7 @@ public class TachyonWorker implements Runnable {
   @Override
   public void run() {
     long lastHeartbeatMs = System.currentTimeMillis();
-    List<Command> cmds = null;
+    Command cmd = null;
     while (!mStop) {
       long diff = System.currentTimeMillis() - lastHeartbeatMs;
       if (diff < WorkerConf.get().TO_MASTER_HEARTBEAT_INTERVAL_MS) {
@@ -266,47 +266,41 @@ public class TachyonWorker implements Runnable {
       }
 
       try {
-        cmds = mWorkerStorage.heartbeat();
+        cmd = mWorkerStorage.heartbeat();
 
         lastHeartbeatMs = System.currentTimeMillis();
       } catch (IOException e) {
         LOG.error(e.getMessage(), e);
         mWorkerStorage.resetMasterClient();
         CommonUtils.sleepMs(LOG, Constants.SECOND_MS);
-        cmds = null;
+        cmd = null;
         if (System.currentTimeMillis() - lastHeartbeatMs >= WorkerConf.get().HEARTBEAT_TIMEOUT_MS) {
           throw new RuntimeException(
               "Heartbeat timeout " + (System.currentTimeMillis() - lastHeartbeatMs) + "ms");
         }
       }
 
-      if (cmds != null) {
-        for (Command cmd : cmds) {
-          switch (cmd.mCommandType) {
-            case Unknown:
-              LOG.error("Unknown command: " + cmd);
-              break;
-            case Nothing:
-              LOG.debug("Nothing command: {}", cmd);
-              break;
-            case Register:
-              LOG.info("Register command: " + cmd);
-              mWorkerStorage.register();
-              break;
-            case Free:
-              mWorkerStorage.freeBlocks(cmd.mData);
-              LOG.info("Free command: " + cmd);
-              break;
-            case Delete:
-              LOG.info("Delete command: " + cmd);
-              break;
-            case Cache:
-              mWorkerStorage.master_cacheFromRemote(-1, cmd.mBlockInfo);
-              LOG.info("Cache command: " + cmd);
-              break;
-            default:
-              throw new RuntimeException("Un-recognized command from master " + cmd.toString());
-          }
+      if (cmd != null) {
+        switch (cmd.mCommandType) {
+          case Unknown:
+            LOG.error("Unknown command: " + cmd);
+            break;
+          case Nothing:
+            LOG.debug("Nothing command: {}", cmd);
+            break;
+          case Register:
+            LOG.info("Register command: " + cmd);
+            mWorkerStorage.register();
+            break;
+          case Free:
+            mWorkerStorage.freeBlocks(cmd.mData);
+            LOG.info("Free command: " + cmd);
+            break;
+          case Delete:
+            LOG.info("Delete command: " + cmd);
+            break;
+          default:
+            throw new RuntimeException("Un-recognized command from master " + cmd.toString());
         }
       }
 

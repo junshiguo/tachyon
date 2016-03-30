@@ -146,7 +146,7 @@ public class MasterInfo extends ImageWriter {
       synchronized (mRootLock) {
         synchronized (mWorkers) {
           MasterWorkerInfo tWorkerInfo = mWorkers.get(workerId);
-          tWorkerInfo.updateToCachedBlock(true, blockId);
+          // tWorkerInfo.updateToCachedBlock(true, blockId);
           // tWorkerInfo.updateLastUpdatedTimeMs();
         }
       }
@@ -157,7 +157,7 @@ public class MasterInfo extends ImageWriter {
       synchronized (mRootLock) {
         synchronized (mWorkers) {
           MasterWorkerInfo tWorkerInfo = mWorkers.get(workerId);
-          tWorkerInfo.updateToCachedBlocks(true, blockIds);
+          // tWorkerInfo.updateToCachedBlocks(true, blockIds);
         }
       }
       return true;
@@ -2482,7 +2482,7 @@ public class MasterInfo extends ImageWriter {
    * @return a command specifying an action to take
    * @throws BlockInfoException
    */
-  public List<Command> workerHeartbeat(long workerId, long usedBytes, List<Long> removedBlockIds,
+  public Command workerHeartbeat(long workerId, long usedBytes, List<Long> removedBlockIds,
       Map<Long, List<Long>> addedBlockIds) throws BlockInfoException {
     LOG.debug("WorkerId: {}", workerId);
     List<Command> commands = new ArrayList<>();
@@ -2493,28 +2493,14 @@ public class MasterInfo extends ImageWriter {
         if (tWorkerInfo == null) {
           LOG.info("worker_heartbeat(): Does not contain worker with ID " + workerId
               + " . Send command to let it re-register.");
-          commands.add(new Command(CommandType.Register, new ArrayList<Long>(),
-              new ArrayList<ClientBlockInfo>()));
-          return commands;
+          return new Command(CommandType.Register, new ArrayList<Long>(),
+              new ArrayList<ClientBlockInfo>());
         }
 
         tWorkerInfo.updateUsedBytes(usedBytes);
         tWorkerInfo.updateBlocks(false, removedBlockIds);
         tWorkerInfo.updateToRemovedBlocks(false, removedBlockIds);
         tWorkerInfo.updateLastUpdatedTimeMs();
-        // update to-be-cached blocks, and inform worker to do cache work.
-        tWorkerInfo.updateToCachedBlocks(false, removedBlockIds);
-        tWorkerInfo.updateToCachedBlocks(false, addedBlockIds.keySet());
-        List<ClientBlockInfo> blockInfos = new ArrayList<>();
-        for (long blockId : tWorkerInfo.getToCachedBlocks()) {
-          try {
-            blockInfos.add(getClientBlockInfo(blockId));
-          } catch (FileDoesNotExistException e) {
-            e.printStackTrace();
-          }
-        }
-        // TODO:check, should work
-        commands.add(new Command(CommandType.Cache, tWorkerInfo.getToCachedBlocks(), blockInfos));
 
         for (long blockId : removedBlockIds) {
           int fileId = BlockInfo.computeInodeId(blockId);
@@ -2552,16 +2538,13 @@ public class MasterInfo extends ImageWriter {
 
         List<Long> toRemovedBlocks = tWorkerInfo.getToRemovedBlocks();
         if (toRemovedBlocks.size() != 0) {
-          commands.add(
-              new Command(CommandType.Free, toRemovedBlocks, new ArrayList<ClientBlockInfo>()));
-          return commands;
+          return new Command(CommandType.Free, toRemovedBlocks, new ArrayList<ClientBlockInfo>());
         }
       }
     }
 
-    commands.add(
-        new Command(CommandType.Nothing, new ArrayList<Long>(), new ArrayList<ClientBlockInfo>()));
-    return commands;
+    return new Command(CommandType.Nothing, new ArrayList<Long>(),
+        new ArrayList<ClientBlockInfo>());
   }
 
   /**
@@ -2604,19 +2587,20 @@ public class MasterInfo extends ImageWriter {
     return LOG;
   }
 
-  public synchronized Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(
-      NetAddress workerAddress, Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId,
-      long requestBytes, boolean isLastTier) {
+  public Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(NetAddress workerAddress,
+      Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId, long requestBytes,
+      boolean isLastTier) {
     // return mEvictGlobal.getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds, blockId,
     // requestBytes, isLastTier);
     return null;
   }
 
-  public synchronized void accessFile(int fileId) {
+  public void accessFile(int fileId) {
+    getLog().info("MasterInfo accessing file with id = " + fileId);
     mEvictGlobalInfo.accessFile(fileId);
   }
 
-  public synchronized Map<Integer, Long> worker_getMemAllocationPlan() {
+  public Map<Integer, Long> worker_getMemAllocationPlan() {
     return mEvictGlobalInfo.getMemAllocationPlan();
   }
 

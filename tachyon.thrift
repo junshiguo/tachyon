@@ -156,7 +156,7 @@ service MasterService {
    * return the command from master to worker. addedBlockIds maps from id of storage directory
    * to the blocks added in it.
    */
-  list<Command> worker_heartbeat(1: i64 workerId, 2: i64 usedBytes, 3: list<i64> removedBlockIds,
+  Command worker_heartbeat(1: i64 workerId, 2: i64 usedBytes, 3: list<i64> removedBlockIds,
       4: map<i64, list<i64>> addedBlockIds)
     throws (1: BlockInfoException e)
 
@@ -271,11 +271,6 @@ service MasterService {
 
   bool user_freepath(1: i32 fileId, 2: string path, 3: bool recursive)
     throws (1: FileDoesNotExistException e)
-
-  /**
-   * newly added. blockId: the block that need space, used to get which file is requesting space
-   */
-  map<i64, list<WorkerBlockInfo>> worker_getBlocksToEvict(1: NetAddress workerAddress, 2: set<i64> lockedBlocks, 3: list<i64> candidateDir, 4: i64 blockId, 5: i64 requestBytes, 6: bool isLastTier)
 
   void user_accessFile(1: i32 fileId)
 
