@@ -56,7 +56,6 @@ public class TachyonFile implements Comparable<TachyonFile> {
    * @param fid the file id
    */
   TachyonFile(TachyonFS tfs, int fid) {
-    System.out.println("TachyonFile: initializing...");
     mTachyonFS = tfs;
     mFileId = fid;
   }

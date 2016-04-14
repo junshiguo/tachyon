@@ -71,7 +71,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     }
     mTachyonFile.setUFSConf(mHadoopConf);
     try {
-      mTachyonFileInputStream = mTachyonFile.getInStream(ReadType.CACHE);
+      mTachyonFileInputStream = mTachyonFile.getInStream(ReadType.TRY_CACHE);
     } catch (IOException e) {
       LOG.error(e.getMessage());
     }

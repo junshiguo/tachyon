@@ -112,7 +112,10 @@ public class RemoteBlockCache {
     // TODO: cache
     try {
       mWorkerStorage.cacheBlock(mUserId, mBlockInfo.blockId);
-    } catch (SuspectedFileSizeException | BlockInfoException e) {
+    } catch (SuspectedFileSizeException e) {
+      LOG.error("RemoteBlockCache: data transferred successfully! cache failed!");
+      LOG.error(e.getMessage());
+    } catch (BlockInfoException e) {
       LOG.error("RemoteBlockCache: data transferred successfully! cache failed!");
       LOG.error(e.getMessage());
     }

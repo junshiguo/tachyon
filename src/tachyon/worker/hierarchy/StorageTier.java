@@ -98,6 +98,7 @@ public class StorageTier {
         AllocateStrategies.getAllocateStrategy(WorkerConf.get().ALLOCATE_STRATEGY_TYPE);
     mBlockEvictor = EvictStrategies.getEvictStrategy(WorkerConf.get().EVICT_STRATEGY_TYPE,
         isLastTier(), mWorkerStorage);
+    LOG.info("***EvictStrategy: {}", WorkerConf.get().EVICT_STRATEGY_TYPE);
   }
 
   /**
@@ -324,7 +325,7 @@ public class StorageTier {
   }
 
   public Set<Long> getLockedBlocks() {
-    List<Long> ret = new ArrayList<>();
+    List<Long> ret = new ArrayList<Long>();
     for (StorageDir dir : mDirs) {
       ret.addAll(dir.getLockedBlocks());
     }

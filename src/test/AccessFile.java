@@ -15,18 +15,17 @@ import tachyon.client.TachyonFS;
 import tachyon.client.TachyonFile;
 import tachyon.conf.UserConf;
 
-public class Test {
+public class AccessFile {
 
   public static void main(String[] args) {
+    if (args.length == 0) {
+      System.out.println("Parameter: access path");
+      System.exit(0);
+    }
     TachyonURI masterUri = new TachyonURI("tachyon://10.141.211.85:19998");
     try {
       TachyonFS fs = TachyonFS.get(masterUri);
-      System.out.println("TachyonFS get!");
-      // TachyonFile file = fs.getFile("/tachyon.thrift");
-      // System.out.println(file);
-      // fs.delete("/tachyon.thrift", false);
-      fs.accessFile(new TachyonURI("/readme"));
-//      copyPath(new File("tachyon.thrift"), fs, new TachyonURI("/"));
+      fs.accessFile(new TachyonURI(args[0]));
     } catch (IOException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();

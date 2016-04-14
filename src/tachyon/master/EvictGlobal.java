@@ -25,7 +25,7 @@ public class EvictGlobal {
    * with {@link tachyon.master.InodeFile}mBlocks. Updated when InodeFile.mBlocks changes.
    */
   private final ConcurrentMap<Long, ConcurrentMap<Integer, Long>> mWorkerIdToFileDistribution =
-      new ConcurrentHashMap<>();
+      new ConcurrentHashMap<Long, ConcurrentMap<Integer, Long>>();
   /**
    * A map from file ID's to max in-memory block numbers. This is managed by master, looked up when
    * eviction happens and updated upon a file access.

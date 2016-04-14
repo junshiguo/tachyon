@@ -440,4 +440,24 @@ public class WorkerClient implements Closeable {
     }
   }
 
+  /**
+   * Used only in {@link tachyon.client.RemoteBlockInStream} in
+   * {@link tachyon.client.ReadType#TRY_CACHE} mode. BlockOutStream is created after calling this
+   * method and get true response.
+   * 
+   * @param fileId
+   * @return
+   * @throws IOException
+   */
+  public synchronized boolean canCreateBlock(int fileId) throws IOException {
+    mustConnect();
+
+    try {
+      return mClient.canCreateBlock(fileId);
+    } catch (TException e) {
+      mConnected = false;
+      throw new IOException(e);
+    }
+  }
+
 }

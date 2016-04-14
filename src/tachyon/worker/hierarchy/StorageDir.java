@@ -131,6 +131,7 @@ public final class StorageDir {
     synchronized (mLastBlockAccessTimeMs) {
       if (containsBlock(blockId)) {
         mLastBlockAccessTimeMs.put(blockId, System.currentTimeMillis());
+        LOG.info("***StorageDir.accessBlock: access block {}***", blockId);
       }
     }
   }
@@ -195,6 +196,8 @@ public final class StorageDir {
     }
     Long allocatedBytes = mTempBlockAllocatedBytes.remove(blockInfo);
     returnSpace(userId, allocatedBytes - blockSize);
+    mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
+        -allocatedBytes);
     if (mFs.rename(srcPath, dstPath)) {
       addBlockId(blockId, blockSize, false);
       updateUserOwnBytes(userId, -blockSize);
@@ -214,11 +217,17 @@ public final class StorageDir {
    */
   public boolean cancelBlock(long userId, long blockId) throws IOException {
     String filePath = getUserTempFilePath(userId, blockId);
-    Long allocatedBytes = mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, blockId));
+    Pair<Long, Long> key = new Pair<Long, Long>(userId, blockId);
+    boolean exist = mTempBlockAllocatedBytes.containsKey(key);
+    Long allocatedBytes = mTempBlockAllocatedBytes.remove(key);
     if (allocatedBytes == null) {
       allocatedBytes = 0L;
     }
     returnSpace(userId, allocatedBytes);
+    if (exist) {
+      mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
+          -allocatedBytes);
+    }
     if (!mFs.exists(filePath)) {
       return true;
     } else {
@@ -238,7 +247,12 @@ public final class StorageDir {
       mUserPerLockedBlock.remove(blockId, userId);
     }
     for (Long tempBlockId : tempBlockIdList) {
-      mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, tempBlockId));
+      Long allocatedBytes =
+          mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, tempBlockId));
+      if (allocatedBytes != null) {
+        mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(tempBlockId),
+            -1, allocatedBytes);
+      }
     }
     try {
       mFs.delete(getUserTempPath(userId), true);
@@ -732,6 +746,9 @@ public final class StorageDir {
    */
   public void updateTempBlockAllocatedBytes(long userId, long blockId, long sizeBytes) {
     Pair<Long, Long> blockInfo = new Pair<Long, Long>(userId, blockId);
+    // do not add temp block count here. Block count is pre-added.
+    mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), 0,
+        sizeBytes);
     Long oldSize = mTempBlockAllocatedBytes.putIfAbsent(blockInfo, sizeBytes);
     if (oldSize != null) {
       while (!mTempBlockAllocatedBytes.replace(blockInfo, oldSize, oldSize + sizeBytes)) {

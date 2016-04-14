@@ -125,11 +125,17 @@ public class WorkerServiceHandler implements WorkerService.Iface {
   @Override
   public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos)
       throws TException {
-    return mWorkerStorage.master_cacheFromRemote(userId, blockInfos);
+    // return mWorkerStorage.master_cacheFromRemote(userId, blockInfos);
+    return false;
   }
 
   @Override
   public void master_freeBlocks(List<Long> blockIds) throws TException {
     mWorkerStorage.freeBlocks(blockIds);
+  }
+
+  @Override
+  public boolean canCreateBlock(int fileId) throws TException {
+    return mWorkerStorage.canCreateBlock(fileId);
   }
 }

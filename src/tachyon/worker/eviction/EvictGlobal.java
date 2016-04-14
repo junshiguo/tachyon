@@ -20,13 +20,18 @@ public class EvictGlobal implements EvictStrategy {
     mWorkerStorage = workerStorage;
   }
 
+  private boolean blockEvictable(long blockId, Set<Integer> pinList) {
+    return !mLastTier || !pinList.contains(tachyon.master.BlockInfo.computeInodeId(blockId));
+  }
+
   @Override
-  public Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
+  public synchronized Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
       Set<Integer> pinList, long requestBytes) {
     Map<Integer, Long> memAllocation = mWorkerStorage.getMemAllocationPlan();
     if (memAllocation == null) {
       return null;
     }
+    WorkerStorage.getLog().info("***EvictGlobal: getMemAllocationPlan: {}***", memAllocation);
     Pair<StorageDir, List<BlockInfo>> dirCandidate = null;
     for (StorageDir dir : storageDirs) {
       dirCandidate = getDirCandidate(memAllocation, dir, pinList, requestBytes);
@@ -42,23 +47,29 @@ public class EvictGlobal implements EvictStrategy {
     Map<Integer, Long> fileDistribution = mWorkerStorage.getFileDistributionClone();
     Set<Entry<Long, Long>> blocks = curDir.getBlockSizes();
     long mem = curDir.getAvailableBytes();
-    List<BlockInfo> toEvictBlocks = new ArrayList<>();
+    List<BlockInfo> toEvictBlocks = new ArrayList<BlockInfo>();
     for (Entry<Long, Long> entry : blocks) {
       long blockId = entry.getKey();
-      if (pinList.contains(blockId)) {
+      if (!blockEvictable(blockId, pinList)) {
         continue;
       }
       long blockSize = entry.getValue();
       int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
       Long fileConsumption = fileDistribution.get(fileId);
-      if (fileConsumption > memAllocation.get(fileId)) {
-        mem += curDir.getBlockSize(blockSize);
+      if (fileConsumption == null || fileConsumption
+          + mWorkerStorage.getFileTempMaxBytes(fileId) > memAllocation.get(fileId)) {
+        mem += curDir.getBlockSize(blockId);
         toEvictBlocks.add(new BlockInfo(curDir, blockId, blockSize));
-        fileConsumption -= blockSize;
-        if (fileConsumption > 0) {
-          fileDistribution.put(fileId, fileConsumption);
-        } else {
-          fileDistribution.remove(fileId);
+        WorkerStorage.getLog().info(
+            "***EvictGlobal: candidate fileid {}, blockid {}, blocksize {}, dir {}***", fileId,
+            blockId, blockSize, curDir);
+        if (fileConsumption != null) {
+          fileConsumption -= blockSize;
+          if (fileConsumption > 0) {
+            fileDistribution.put(fileId, fileConsumption);
+          } else {
+            fileDistribution.remove(fileId);
+          }
         }
       }
 

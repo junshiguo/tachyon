@@ -1039,7 +1039,7 @@ public class MasterInfo extends ImageWriter {
   public int cacheBlock(long workerId, long workerUsedBytes, long storageDirId, long blockId,
       long length)
           throws FileDoesNotExistException, SuspectedFileSizeException, BlockInfoException {
-    LOG.debug("Cache block: {}",
+    LOG.info("Cache block: {}",
         CommonUtils.parametersToString(workerId, workerUsedBytes, blockId, length));
 
     MasterWorkerInfo tWorkerInfo = getWorkerInfo(workerId);
@@ -2485,7 +2485,6 @@ public class MasterInfo extends ImageWriter {
   public Command workerHeartbeat(long workerId, long usedBytes, List<Long> removedBlockIds,
       Map<Long, List<Long>> addedBlockIds) throws BlockInfoException {
     LOG.debug("WorkerId: {}", workerId);
-    List<Command> commands = new ArrayList<>();
     synchronized (mRootLock) {
       synchronized (mWorkers) {
         MasterWorkerInfo tWorkerInfo = mWorkers.get(workerId);
@@ -2596,7 +2595,6 @@ public class MasterInfo extends ImageWriter {
   }
 
   public void accessFile(int fileId) {
-    getLog().info("MasterInfo accessing file with id = " + fileId);
     mEvictGlobalInfo.accessFile(fileId);
   }
 

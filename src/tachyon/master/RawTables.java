@@ -73,7 +73,7 @@ public class RawTables extends ImageWriter {
   }
 
   /**
-   * Test if the raw table exist or not.
+   * AccessFile if the raw table exist or not.
    *
    * @param inodeId the raw table id.
    * @return true if the table exists, false otherwise.

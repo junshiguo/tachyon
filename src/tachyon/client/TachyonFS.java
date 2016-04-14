@@ -122,7 +122,7 @@ public class TachyonFS extends AbstractTachyonFS {
     String authority = mMasterAddress.getHostName() + ":" + mMasterAddress.getPort();
     mRootUri = new TachyonURI(scheme, authority, TachyonURI.SEPARATOR);
   }
-
+  
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
   private final long mUserQuotaUnitBytes = UserConf.get().QUOTA_UNIT_BYTES;
   private final int mUserFailedSpaceRequestLimits = UserConf.get().FAILED_SPACE_REQUEST_LIMITS;
@@ -484,11 +484,6 @@ public class TachyonFS extends AbstractTachyonFS {
     if (clientFileInfo == null) {
       return null;
     }
-    System.out.println("TachyonFS.getFile(fid, useCachedMetadata: get ClientInfo done!\n"
-        + clientFileInfo.isFolder);
-    if (!clientFileInfo.isFolder) {
-      mMasterClient.user_accessFile(clientFileInfo.getId());
-    }
     return new TachyonFile(this, fid);
   }
 
@@ -534,21 +529,16 @@ public class TachyonFS extends AbstractTachyonFS {
       throws IOException {
     validateUri(path);
     ClientFileInfo clientFileInfo = getFileStatus(-1, path, useCachedMetadata);
-    System.out.println("TachyonFS.getFile: get ClientFileInfo done");
     if (clientFileInfo == null) {
       return null;
     }
-    System.out.println(clientFileInfo.isFolder);
-    // if (!clientFileInfo.isFolder) {
-    // mMasterClient.user_accessFile(clientFileInfo.getId());
-    // }
     return new TachyonFile(this, clientFileInfo.getId());
   }
 
   public synchronized boolean accessFile(TachyonURI path) throws IOException {
     validateUri(path);
     ClientFileInfo clientFileInfo = getFileStatus(-1, path, false);
-//    System.out.println("TachyonFS.accessFile: fileid = " + clientFileInfo.getId());
+    // System.out.println("TachyonFS.accessFile: fileid = " + clientFileInfo.getId());
     mMasterClient.user_accessFile(clientFileInfo.getId());
     return true;
   }
@@ -1008,5 +998,9 @@ public class TachyonFS extends AbstractTachyonFS {
         || (uri.hasAuthority() && !mRootUri.getAuthority().equals(uri.getAuthority()))) {
       throw new IOException("Uri " + uri + " is invalid.");
     }
+  }
+  
+  public synchronized boolean canCreateBlock(int fileId) throws IOException {
+    return mWorkerClient.canCreateBlock(fileId);
   }
 }

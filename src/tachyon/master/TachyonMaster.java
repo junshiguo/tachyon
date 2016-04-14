@@ -135,7 +135,7 @@ public class TachyonMaster {
   }
 
   /**
-   * Get MasterInfo instance for Unit Test
+   * Get MasterInfo instance for Unit AccessFile
    * 
    * @return MasterInfo of the Master
    */

@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.mapred.TaskLog.LogName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +50,7 @@ import tachyon.StorageLevelAlias;
 import tachyon.UnderFileSystem;
 import tachyon.Users;
 import tachyon.conf.CommonConf;
+import tachyon.conf.UserConf;
 import tachyon.conf.WorkerConf;
 import tachyon.master.MasterClient;
 import tachyon.thrift.BlockInfoException;
@@ -313,7 +313,13 @@ public class WorkerStorage {
    * {@link tachyon.worker.hierarchy.StorageDir#addBlockId} and
    * {@link tachyon.worker.hierarchy.StorageDir#deleteBlockId}
    */
-  private Map<Integer, Long> mFileDistribution = new ConcurrentHashMap<>();
+  private Map<Integer, Long> mFileDistribution = new ConcurrentHashMap<Integer, Long>();
+  /**
+   * Mapping from file id to its temp block counts and already used temp bytes. This.is newly
+   * added!!! Consistent with mTempBlockLocation.
+   */
+  private Map<Integer, Pair<Integer, Long>> mFileTempBlockCountAndUsedBytes =
+      new ConcurrentHashMap<Integer, Pair<Integer, Long>>();
 
   /**
    * Main logic behind the worker process.
@@ -507,6 +513,7 @@ public class WorkerStorage {
       long blockSize = storageDir.getBlockSize(blockId);
       mMasterClient.worker_cacheBlock(mWorkerId, getUsedBytes(), storageDir.getStorageDirId(),
           blockId, blockSize);
+      LOG.info("***WorkerStorage.cacheBlock: cache block {} in worker***", blockId);
     }
   }
 
@@ -603,7 +610,6 @@ public class WorkerStorage {
   }
 
   public StorageDir getStorageDirByDirId(long storageDirId) {
-    StorageDir storageDir = null;
     StorageTier storageTier = mStorageTiers.get(StorageDirId.getStorageLevel(storageDirId));
     return storageTier.getmDirs()[StorageDirId.getStorageDirIndex(storageDirId)];
   }
@@ -750,7 +756,7 @@ public class WorkerStorage {
     } else if (StorageDirId.getStorageLevelAliasValue(storageDir.getStorageDirId()) != mStorageTiers
         .get(0).getAlias().getValue()) {
       long blockSize = storageDir.getBlockSize(blockId);
-      StorageDir dstStorageDir = requestSpace(null, userId, blockSize, blockId);
+      StorageDir dstStorageDir = requestSpace(null, userId, blockSize);
       if (dstStorageDir == null) {
         LOG.error("Failed to promote block! blockId:{}", blockId);
         storageDir.unlockBlock(blockId, userId);
@@ -825,7 +831,7 @@ public class WorkerStorage {
           .format("Block file is being written! userId(%d)" + " blockId(%d)", userId, blockId));
     }
 
-    StorageDir storageDir = requestSpace(null, userId, initialBytes, blockId);
+    StorageDir storageDir = requestSpace(null, userId, initialBytes);
     if (storageDir == null) {
       throw new OutOfSpaceException(
           String.format("Failed to allocate space for block! blockId(%d)" + " sizeBytes(%d)",
@@ -847,8 +853,7 @@ public class WorkerStorage {
    * @param requestBytes The requested space size, in bytes
    * @return StorageDir assigned, null if failed
    */
-  private StorageDir requestSpace(StorageDir dirCandidate, long userId, long requestBytes,
-      long requestBlockId) {
+  private StorageDir requestSpace(StorageDir dirCandidate, long userId, long requestBytes) {
     Set<Integer> pinList;
 
     try {
@@ -898,7 +903,7 @@ public class WorkerStorage {
       throw new FileDoesNotExistException("Temporary block file doesn't exist! blockId:" + blockId);
     }
 
-    if (storageDir == requestSpace(storageDir, userId, requestBytes, blockId)) {
+    if (storageDir == requestSpace(storageDir, userId, requestBytes)) {
       storageDir.updateTempBlockAllocatedBytes(userId, blockId, requestBytes);
       return true;
     } else {
@@ -995,27 +1000,27 @@ public class WorkerStorage {
     return null;
   }
 
-  public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) {
-    try {
-      RemoteBlockCache block = new RemoteBlockCache(this, userId, blockInfo);
-      block.cache();
-      return true;
-    } catch (OutOfSpaceException | FileAlreadyExistException | IOException | TachyonException
-        | FileDoesNotExistException e) {
-      LOG.error(e.getMessage());
-      return false;
-    }
-  }
+  // public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) {
+  // try {
+  // RemoteBlockCache block = new RemoteBlockCache(this, userId, blockInfo);
+  // block.cache();
+  // return true;
+  // } catch (OutOfSpaceException | FileAlreadyExistException | IOException | TachyonException
+  // | FileDoesNotExistException e) {
+  // LOG.error(e.getMessage());
+  // return false;
+  // }
+  // }
 
-  public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos) {
-    boolean ret = true;
-    for (ClientBlockInfo blockInfo : blockInfos) {
-      if (master_cacheFromRemote(userId, blockInfo) == false) {
-        ret = false;
-      }
-    }
-    return ret;
-  }
+  // public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos) {
+  // boolean ret = true;
+  // for (ClientBlockInfo blockInfo : blockInfos) {
+  // if (master_cacheFromRemote(userId, blockInfo) == false) {
+  // ret = false;
+  // }
+  // }
+  // return ret;
+  // }
 
   public NetAddress getmWorkerAddress() {
     return mWorkerAddress;
@@ -1060,12 +1065,138 @@ public class WorkerStorage {
     }
   }
 
+  private Map<Integer, Long> mMemAllocationPlan = new HashMap<>();
+
   public Map<Integer, Long> getMemAllocationPlan() {
     try {
-      return mMasterClient.worker_getMemAllocationPlan();
+      mMemAllocationPlan = mMasterClient.worker_getMemAllocationPlan();
+      return mMemAllocationPlan;
     } catch (IOException e) {
       LOG.error(e.getMessage());
     }
-    return null;
+    mMemAllocationPlan = new HashMap<>();
+    return mMemAllocationPlan;
+  }
+
+  public int getFileTempBlockCount(int fileId) {
+    Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+    if (fileInfo != null) {
+      return fileInfo.getFirst();
+    }
+    return 0;
+  }
+
+  public long getFileTempSizeBytes(int fileId) {
+    Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+    if (fileInfo != null) {
+      return fileInfo.getSecond();
+    }
+    return 0;
+  }
+
+  public long getFileTempReserveBytes(int fileId) {
+    Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+    if (fileInfo != null) {
+      long ret =
+          UserConf.get().DEFAULT_BLOCK_SIZE_BYTE * fileInfo.getFirst() - fileInfo.getSecond();
+      if (ret > 0) {
+        return ret;
+      }
+    }
+    return 0;
+  }
+
+  public long getFileTempReserveBytes() {
+    synchronized (mFileTempBlockCountAndUsedBytes) {
+      long ret = 0;
+      long temp = 0;
+      for (int fileId : mFileTempBlockCountAndUsedBytes.keySet()) {
+        Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+        temp = UserConf.get().DEFAULT_BLOCK_SIZE_BYTE * fileInfo.getFirst() - fileInfo.getSecond();
+        if (temp > 0) {
+          ret += temp;
+        }
+      }
+      return ret;
+    }
+  }
+
+  public long getFileTempMaxBytes(int fileId) {
+    Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+    if (fileInfo != null) {
+      return UserConf.get().DEFAULT_BLOCK_SIZE_BYTE * fileInfo.getFirst();
+    }
+    return 0;
+  }
+
+  public void updateFileTempBlocks(int fileId, int countDiff, long sizeBytesDiff) {
+    synchronized (mFileTempBlockCountAndUsedBytes) {
+      Pair<Integer, Long> fileTemp = mFileTempBlockCountAndUsedBytes.get(fileId);
+      if (fileTemp != null) {
+        int count = fileTemp.getFirst() + countDiff;
+        if (count == 0) {
+          mFileTempBlockCountAndUsedBytes.remove(fileId);
+        } else {
+          fileTemp.setFirst(count);
+          fileTemp.setSecond(fileTemp.getSecond() + sizeBytesDiff);
+          mFileTempBlockCountAndUsedBytes.put(fileId, fileTemp);
+        }
+      } else if (countDiff > 0) {
+        mFileTempBlockCountAndUsedBytes.put(fileId, new Pair<>(countDiff, sizeBytesDiff));
+      }
+      LOG.info(
+          "***WorkerStorage.updateFileTempBlocks: fileid {}, count diff {}, sizeBytes diff {}***",
+          fileId, countDiff, sizeBytesDiff);
+    }
+  }
+
+  /**
+   * check empty space and memAllocation plan to decide whether to allow file with fileId to create
+   * blockoutstream.
+   * 
+   * This is only used in TRY_CACHE readtype. When such a read instream try to create
+   * {@link tachyon.client.BlockOutStream} resulting in creating a
+   * {@link tachyon.client.RemoteBlockInstream} and readType is TRY_CACHE, it should first call this
+   * method to decide whether to cache the block or not.
+   * 
+   * In this method, the temp block count of a file is added to preserve memory. Temp block count in
+   * {@link this#mFileTempBlockCountAndUsedBytes} should only be added here!
+   * 
+   * @param fileId
+   * @return
+   */
+  public synchronized boolean canCreateBlock(int fileId) {
+    long left = mCapacityBytes - getUsedBytes() - getFileTempReserveBytes();
+    long tempMax = getFileTempMaxBytes(fileId);
+    Long allocated = getMemAllocationPlan().get(fileId);
+    if (allocated == null) {
+      allocated = 0L;
+    }
+    Long used = mFileDistribution.get(fileId);
+    if (used == null) {
+      used = 0L;
+    }
+    LOG.info(
+        "***WorkerStorage.canCreateBlock: system left {}, used {}, temp max {}, allocated {}***",
+        left, used, tempMax, allocated);
+    if (left > UserConf.get().DEFAULT_BLOCK_SIZE_BYTE || used + tempMax < allocated) {
+      Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+      if (fileInfo != null) {
+        fileInfo.setFirst(fileInfo.getFirst() + 1);
+        mFileTempBlockCountAndUsedBytes.put(fileId, fileInfo);
+      } else {
+        mFileTempBlockCountAndUsedBytes.put(fileId, new Pair<>(1, 0L));
+      }
+
+      LOG.info("***WorkerStorage.canCreateBlock: file with id " + fileId + " can create block.***");
+      LOG.info("***{}***", mFileTempBlockCountAndUsedBytes);
+      return true;
+    }
+    LOG.info("***WorkerStorage.canCreateBlock: file with id {} failed to preserve block", fileId);
+    return false;
+  }
+
+  public static Logger getLog() {
+    return LOG;
   }
 }

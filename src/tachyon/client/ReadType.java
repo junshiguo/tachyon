@@ -32,7 +32,13 @@ public enum ReadType {
    * If the block is on local Tachyon space but not on top storage layer, promote the block to top
    * storage layer after reading.
    */
-  CACHE_PROMOTE(3);
+  CACHE_PROMOTE(3),
+
+  /**
+   * Newly added. Used only by HDFS test. If there is enough space - counting the temp space - for
+   * the block, cache the block. Else otherwise.
+   */
+  TRY_CACHE(4);
 
   private final int mValue;
 
@@ -61,5 +67,14 @@ public enum ReadType {
    */
   public boolean isPromote() {
     return mValue == CACHE_PROMOTE.mValue;
+  }
+
+  /**
+   * Should only be called in RemoteBlockInStream
+   * 
+   * @return true if the read type is TRY_CACHE, false otherwise
+   */
+  public boolean isTryCache() {
+    return mValue == TRY_CACHE.mValue;
   }
 }

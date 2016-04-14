@@ -9,7 +9,7 @@ import tachyon.Pair;
 import tachyon.conf.MasterConf;
 
 public class EvictGlobalInfo {
-  private static final double A = 1.0 / (Math.E - 1);
+  // private static final double A = 1.0 / (Math.E - 1);
   private static long sQUEUESIZE;
   private static long sMEMORYSUM;
 
@@ -19,7 +19,7 @@ public class EvictGlobalInfo {
    * A map from file ID's to max in-memory block numbers. This is managed by master, looked up when
    * eviction happens and updated upon a file access.
    */
-  private Map<Integer, Long> mFileIdToMaxMem = new HashMap<>();
+  private Map<Integer, Long> mFileIdToMaxMem = new HashMap<Integer, Long>();
   /**
    * Map from file id to file size, in the up coming order
    */
@@ -29,8 +29,8 @@ public class EvictGlobalInfo {
 
   public EvictGlobalInfo(MasterInfo masterInfo) {
     mMasterInfo = masterInfo;
+    // sQUEUESIZE = MasterConf.get().MEMORY_QUEUE_SIZE;
     sQUEUESIZE = MasterConf.get().MEMORY_QUEUE_SIZE;
-//    sMEMORYSUM = mMasterInfo.getCapacityBytes();
   }
 
   /**
@@ -63,11 +63,15 @@ public class EvictGlobalInfo {
    * @return
    */
   public synchronized Map<Integer, Long> getMemAllocationPlan() {
+    MasterInfo.getLog().info("***EvictGlobalInfo.getMemAllocationPlan: mFileAccessQueue:{}",
+        mFileAccessQueue);
+    MasterInfo.getLog().info("***EvictGlobalInfo.getMemAllocationPlan: mFileAccessCount:{}",
+        mFileAccessCount);
     if (!mFileAccessed) {
       return new HashMap<>(mFileIdToMaxMem);
     }
 
-    sMEMORYSUM = mMasterInfo.getCapacityBytes();
+    updateMemSize();
     updateQueue();
     cleanAccessCount();
 
@@ -92,22 +96,21 @@ public class EvictGlobalInfo {
     long allocation;
     int fi;
     int workerNumber = mMasterInfo.getWorkerCount();
-    double percent;
-    StringBuilder sb = new StringBuilder(
-        "***EvictGlobalInfo.getMemAllocationPlan: memory sum=" + sMEMORYSUM + ", access count sum="
-            + accessCountSum + ", file size sum=" + fileSizeSum + ", workerNumber=" + workerNumber);
+    StringBuilder sb = new StringBuilder("***EvictGlobalInfo.getMemAllocationPlan: memory sum="
+        + sMEMORYSUM + ", access count sum=" + accessCountSum + ", file size sum=" + fileSizeSum
+        + ", workerNumber=" + workerNumber + ", plan=[");
     for (int fileId : fileAccessCount.keySet()) {
       dsi = fileSizes.get(fileId);
       fi = fileAccessCount.get(fileId);
-      percent = 1.0 * fi * (sMEMORYSUM - A * fileSizeSum) / (dsi * accessCountSum) - A;
-      allocation = (long) (percent * dsi);
-      allocation = Math.max(0, Math.min(dsi, allocation));
+      allocation = (long) (1.0 * fi * sMEMORYSUM / accessCountSum);
+      allocation = Math.min(dsi, allocation);
       fileIdToMaxMem.put(fileId, allocation / workerNumber);
       sb.append("[" + fileId + ", " + allocation / workerNumber + "],");
     }
     mFileIdToMaxMem = fileIdToMaxMem;
     mFileAccessed = false;
-    sb.append("***");
+    sb.deleteCharAt(sb.length() - 1);
+    sb.append("]***");
     MasterInfo.getLog().info(sb.toString());
     return fileIdToMaxMem;
   }
@@ -119,12 +122,12 @@ public class EvictGlobalInfo {
     while (mFileQueueLength > sQUEUESIZE) {
       Pair<Integer, Long> file = mFileAccessQueue.poll();
       if (file == null) {
-        MasterInfo.getLog().info("EvictGlobal.updsateLRUCandidateFile: mFileAccessQueue is empty");
+        MasterInfo.getLog().info("***EvictGlobal.updateQueue: mFileAccessQueue is empty");
         return;
       }
       mFileQueueLength -= file.getSecond();
       if (!mFileAccessCount.containsKey(file.getFirst())) {
-        MasterInfo.getLog().info("EvictGlobalInfo: file id not found in mFileAccessCount");
+        MasterInfo.getLog().info("***EvictGlobalInfo: file id not found in mFileAccessCount");
         continue;
       }
       if (mFileAccessCount.get(file.getFirst()) == 1) {
@@ -132,6 +135,8 @@ public class EvictGlobalInfo {
       } else {
         mFileAccessCount.put(file.getFirst(), mFileAccessCount.get(file.getFirst()) - 1);
       }
+      MasterInfo.getLog().info("***EvictGlobalInfo.updateQueue: remove file with id "
+          + file.getFirst() + " from queue.***");
     }
   }
 
@@ -145,8 +150,77 @@ public class EvictGlobalInfo {
       Inode inode = mMasterInfo.getmFileIdToInodes().get(fileId);
       if (inode == null || inode.isDirectory()) {
         iterator.remove();
+        MasterInfo.getLog().info(
+            "***EvictGlobalInfo.cleanAccessCount: remove inode {} from mFileAccessCount.***",
+            inode);
       }
     }
+  }
+
+  private void updateMemSize() {
+    sMEMORYSUM = mMasterInfo.getCapacityBytes();
+  }
+
+  /**
+   * for test only
+   * 
+   * @param fileId
+   * @param length
+   */
+  public void accessFileTest(int fileId, long length) {
+    mFileAccessQueue.add(new Pair<Integer, Long>(fileId, length));
+    mFileQueueLength += length;
+    if (mFileAccessCount.containsKey(fileId)) {
+      mFileAccessCount.put(fileId, mFileAccessCount.get(fileId) + 1);
+    } else {
+      mFileAccessCount.put(fileId, 1);
+    }
+    System.out.println("***accessFile: fileid=" + fileId + ", length=" + length);
+  }
+
+  public Map<Integer, Long> getMemAllocationPlanTest() {
+    updateMemSizeTest();
+    updateQueue();
+
+    Map<Integer, Long> fileSizes = new HashMap<>();
+    long fileSizeSum = 0;
+    int accessCountSum = 0;
+    Map<Integer, Integer> fileAccessCount = new HashMap<>(mFileAccessCount);
+    for (int fileId : fileAccessCount.keySet()) {
+      long length = fileId * 10;
+      fileSizes.put(fileId, length);
+      fileSizeSum += length;
+      accessCountSum += fileAccessCount.get(fileId);
+    }
+
+    Map<Integer, Long> fileIdToMaxMem = new HashMap<>();
+    long dsi;
+    long allocation;
+    int fi;
+    int workerNumber = 1;
+    double percent;
+    StringBuilder sb = new StringBuilder("***EvictGlobalInfo.getMemAllocationPlan: memory sum="
+        + sMEMORYSUM + ", access count sum=" + accessCountSum + ", file size sum=" + fileSizeSum
+        + ", workerNumber=" + workerNumber + ",plan:");
+    for (int fileId : fileAccessCount.keySet()) {
+      dsi = fileSizes.get(fileId);
+      fi = fileAccessCount.get(fileId);
+      // percent = 1.0 * fi * (sMEMORYSUM + A * fileSizeSum) / (dsi * accessCountSum) - A;
+      percent = 1.0 * fi * sMEMORYSUM / dsi / accessCountSum;
+      allocation = (long) (percent * dsi);
+      allocation = Math.max(0, Math.min(dsi, allocation));
+      fileIdToMaxMem.put(fileId, allocation / workerNumber);
+      sb.append("[" + fileId + ", " + allocation / workerNumber + "],");
+    }
+    mFileIdToMaxMem = fileIdToMaxMem;
+    mFileAccessed = false;
+    sb.append("***");
+    System.out.println(sb.toString());
+    return fileIdToMaxMem;
+  }
+
+  private void updateMemSizeTest() {
+    sMEMORYSUM = 10;
   }
 
 }

@@ -32,7 +32,9 @@ public class RemoteCache {
     try {
       RemoteCache remoteCache = new RemoteCache();
       remoteCache.doCache("/readme");
-    } catch (IOException | TException e) {
+    } catch (TException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
       e.printStackTrace();
     }
   }
@@ -74,7 +76,7 @@ public class RemoteCache {
             mCloser.register(new WorkerClientRemote(tachyonFS.getmMasterClient(),
                 workerInfo.getAddress(), mExecutorService));
         worker.mustConnect();
-        List<ClientBlockInfo> blockInfos = new ArrayList<>();
+        List<ClientBlockInfo> blockInfos = new ArrayList<ClientBlockInfo>();
         blockInfos.add(blockInfo);
         worker.master_cacheFromRemote(-1, blockInfos);
         mCloser.close();

@@ -413,7 +413,7 @@ public class Performance {
     final long takenTimeMs = System.currentTimeMillis() - startTimeMs;
     double result = 1000.0 * sFilesBytes / takenTimeMs / 1024 / 1024;
 
-    LOG.info(result + " Mb/sec. " + sResultPrefix + "Entire " + msg + " Test : " + " Took "
+    LOG.info(result + " Mb/sec. " + sResultPrefix + "Entire " + msg + " AccessFile : " + " Took "
         + takenTimeMs + " ms. Current System Time: " + System.currentTimeMillis());
   }
 
@@ -501,9 +501,9 @@ public class Performance {
           + "-jar-with-dependencies.jar tachyon.examples.Performance "
           + "<MasterIp> <FileNamePrefix> <WriteBlockSizeInBytes> <BlocksPerFile> "
           + "<DebugMode:true/false> <Threads> <FilesPerThread> <TestCaseNumber> "
-          + "<BaseFileNumber>\n" + "1: Files Write Test\n" + "2: Files Read Test\n"
-          + "3: RamFile Write Test \n" + "4: RamFile Read Test \n" + "5: ByteBuffer Write Test \n"
-          + "6: ByteBuffer Read Test \n");
+          + "<BaseFileNumber>\n" + "1: Files Write AccessFile\n" + "2: Files Read AccessFile\n"
+          + "3: RamFile Write AccessFile \n" + "4: RamFile Read AccessFile \n" + "5: ByteBuffer Write AccessFile \n"
+          + "6: ByteBuffer Read AccessFile \n");
       System.exit(-1);
     }
 
@@ -552,11 +552,11 @@ public class Performance {
       LOG.info(sResultPrefix);
       memoryCopyTest(false, false);
     } else if (testCase == 5) {
-      sResultPrefix = "ByteBuffer Write Test " + sResultPrefix;
+      sResultPrefix = "ByteBuffer Write AccessFile " + sResultPrefix;
       LOG.info(sResultPrefix);
       memoryCopyTest(true, true);
     } else if (testCase == 6) {
-      sResultPrefix = "ByteBuffer Read Test " + sResultPrefix;
+      sResultPrefix = "ByteBuffer Read AccessFile " + sResultPrefix;
       LOG.info(sResultPrefix);
       memoryCopyTest(false, true);
     } else if (testCase == 7) {
@@ -568,7 +568,7 @@ public class Performance {
       LOG.info(sResultPrefix);
       HdfsTest(false);
     } else {
-      throw new RuntimeException("No Test Case " + testCase);
+      throw new RuntimeException("No AccessFile Case " + testCase);
     }
 
     for (int k = 0; k < RESULT_ARRAY_SIZE; k ++) {

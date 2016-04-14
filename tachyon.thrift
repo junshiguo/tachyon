@@ -362,4 +362,6 @@ service WorkerService {
    * Newly added. Master call this to explicitly free a block.
    */
   void master_freeBlocks(1: list<i64> blockIds)
+
+  bool canCreateBlock(1: i32 fileId)
 }

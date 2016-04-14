@@ -139,9 +139,7 @@ public class TFsShell implements Closeable {
 
   private int copyPath(File src, TachyonFS tachyonClient, TachyonURI dstPath) throws IOException {
     if (!src.isDirectory()) {
-      System.out.println("TFsShell.copyPath: trying getFile...");
       TachyonFile tFile = tachyonClient.getFile(dstPath);
-      System.out.println("TFsShell.copyPath: getFile done!");
       if (tFile != null && tFile.isDirectory()) {
         dstPath = dstPath.join(src.getName());
       }
@@ -149,9 +147,7 @@ public class TFsShell implements Closeable {
       if (fileId == -1) {
         return -1;
       }
-      System.out.println("TFsShell.copyPath: createFile done " + dstPath);
       tFile = tachyonClient.getFile(fileId);
-      System.out.println("TFsShell.copyPath: get file through id " + fileId);
       Closer closer = Closer.create();
       try {
         OutStream os = closer.register(tFile.getOutStream(UserConf.get().DEFAULT_WRITE_TYPE));

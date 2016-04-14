@@ -80,6 +80,13 @@ public class RemoteBlockInStream extends BlockInStream {
   private boolean mRecache;
 
   /**
+   * true is we try cache the file.
+   */
+  private boolean mTrycache;
+
+  private boolean mTryCreateBlock;
+
+  /**
    * True initially, will be false after a cache miss, meaning no worker had this block in memory.
    * Afterward, all reads will go directly to the under filesystem.
    */
@@ -131,7 +138,11 @@ public class RemoteBlockInStream extends BlockInStream {
 
     mRecache = readType.isCache();
 
+    mTrycache = readType.isTryCache();
+
     mUFSConf = ufsConf;
+
+    mTryCreateBlock = true;
   }
 
   /**
@@ -140,8 +151,10 @@ public class RemoteBlockInStream extends BlockInStream {
    * @throws IOException
    */
   private void cancelRecache() throws IOException {
-    if (mRecache) {
+    mTryCreateBlock = false;
+    if (mRecache || mTrycache) {
       mRecache = false;
+      mTrycache = false;
       if (mBlockOutStream != null) {
         mBlockOutStream.cancel();
       }
@@ -153,7 +166,7 @@ public class RemoteBlockInStream extends BlockInStream {
     if (mClosed) {
       return;
     }
-    if (mRecache && mBlockOutStream != null) {
+    if ((mRecache || mTrycache) && mBlockOutStream != null) {
       // We only finish re-caching if we've gotten to the end of the file
       if (mBlockPos == mBlockInfo.length) {
         mBlockOutStream.close();
@@ -199,12 +212,25 @@ public class RemoteBlockInStream extends BlockInStream {
     int bytesLeft = len;
     // Lazy initialization of the out stream for caching to avoid collisions with other caching
     // attempts that are invalidated later due to seek/skips
-    if (bytesLeft > 0 && mBlockOutStream == null && mRecache) {
-      try {
-        mBlockOutStream = new BlockOutStream(mFile, WriteType.TRY_CACHE, mBlockIndex);
-      } catch (IOException ioe) {
-        LOG.warn("Recache attempt failed.", ioe);
-        cancelRecache();
+    if (mTryCreateBlock && bytesLeft > 0 && mBlockOutStream == null) {
+      if (mRecache) {
+        try {
+          mBlockOutStream = new BlockOutStream(mFile, WriteType.TRY_CACHE, mBlockIndex);
+        } catch (IOException ioe) {
+          LOG.warn("Recache attempt failed.", ioe);
+          cancelRecache();
+        }
+      } else if (mTrycache) {
+        try {
+          if (mTachyonFS.canCreateBlock(mFile.mFileId)) {
+            mBlockOutStream = new BlockOutStream(mFile, WriteType.TRY_CACHE, mBlockIndex);
+          } else {
+            mTryCreateBlock = false;
+          }
+        } catch (IOException ioe) {
+          LOG.warn("Trycache failed.", ioe);
+          cancelRecache();
+        }
       }
     }
 
@@ -213,7 +239,7 @@ public class RemoteBlockInStream extends BlockInStream {
     while (bytesLeft > 0 && mAttemptReadFromWorkers && updateCurrentBuffer()) {
       int bytesToRead = (int) Math.min(bytesLeft, mCurrentBuffer.remaining());
       mCurrentBuffer.get(b, off, bytesToRead);
-      if (mRecache) {
+      if (mRecache || (mTrycache && mBlockOutStream != null)) {
         mBlockOutStream.write(b, off, bytesToRead);
       }
       off += bytesToRead;
@@ -238,7 +264,7 @@ public class RemoteBlockInStream extends BlockInStream {
           LOG.error("Checkpoint stream read 0 bytes, which shouldn't ever happen");
           return len - bytesLeft;
         }
-        if (mRecache) {
+        if (mRecache || (mTrycache && mBlockOutStream != null)) {
           mBlockOutStream.write(b, off, readBytes);
         }
         off += readBytes;
