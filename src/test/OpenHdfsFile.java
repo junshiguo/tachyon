@@ -19,7 +19,7 @@ public class OpenHdfsFile {
       TachyonURI ufsUri = new TachyonURI(mUnderFSAddress);
       TachyonURI ufsAddrPath =
           new TachyonURI(ufsUri.getScheme(), ufsUri.getAuthority(), filepath.getPath());
-      UfsUtils.loadUnderFs(tfs, filepath.getParent(), ufsAddrPath, new PrefixList(null));
+      UfsUtils.loadUnderFs(tfs, filepath, ufsAddrPath, new PrefixList(null));
     }
   }
 

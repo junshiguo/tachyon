@@ -61,8 +61,8 @@ public class EvictGlobal implements EvictStrategy {
         mem += curDir.getBlockSize(blockId);
         toEvictBlocks.add(new BlockInfo(curDir, blockId, blockSize));
         WorkerStorage.getLog().info(
-            "***EvictGlobal: candidate fileid {}, blockid {}, blocksize {}, dir {}***", fileId,
-            blockId, blockSize, curDir);
+            "***EvictGlobal: candidate fileid {}, blockid {}, blocksize {}({}MB), dir {}***",
+            fileId, blockId, blockSize, blockSize / 1024 / 1024, curDir);
         if (fileConsumption != null) {
           fileConsumption -= blockSize;
           if (fileConsumption > 0) {

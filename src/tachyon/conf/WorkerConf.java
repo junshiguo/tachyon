@@ -19,6 +19,7 @@ import com.google.common.base.Optional;
 
 import tachyon.Constants;
 import tachyon.StorageLevelAlias;
+import tachyon.client.ReadType;
 import tachyon.util.CommonUtils;
 import tachyon.util.NetworkUtils;
 import tachyon.worker.NetworkType;
@@ -88,6 +89,8 @@ public class WorkerConf extends Utils {
   public final String[] STORAGE_TIER_DIRS;
   public final String[] STORAGE_TIER_DIR_QUOTA;
 
+  public final ReadType HADOOP_READTYPE;
+
   private WorkerConf() {
     MASTER_HOSTNAME = getProperty("tachyon.master.hostname", NetworkUtils.getLocalHostName());
     MASTER_PORT = getIntProperty("tachyon.master.port", Constants.DEFAULT_MASTER_PORT);
@@ -134,7 +137,9 @@ public class WorkerConf extends Utils {
     NETTY_RECIEVE_BUFFER = Optional
         .fromNullable(getIntegerProperty("tachyon.worker.network.netty.buffer.receive", null));
 
-    EVICT_STRATEGY_TYPE = getEnumProperty("tachyon.worker.evict.strategy", EvictStrategyType.LRU);
+    HADOOP_READTYPE = getEnumProperty("tachyon.hadoop.readtype", ReadType.TRY_CACHE);
+    EVICT_STRATEGY_TYPE =
+        getEnumProperty("tachyon.worker.evict.strategy", EvictStrategyType.GLOBAL);
     ALLOCATE_STRATEGY_TYPE =
         getEnumProperty("tachyon.worker.allocate.strategy", AllocateStrategyType.MAX_FREE);
     STORAGE_LEVELS = getIntProperty("tachyon.worker.hierarchystore.level.max", 1);

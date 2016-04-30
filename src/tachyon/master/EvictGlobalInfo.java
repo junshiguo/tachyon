@@ -63,14 +63,13 @@ public class EvictGlobalInfo {
    * @return
    */
   public synchronized Map<Integer, Long> getMemAllocationPlan() {
-    MasterInfo.getLog().info("***EvictGlobalInfo.getMemAllocationPlan: mFileAccessQueue:{}",
-        mFileAccessQueue);
-    MasterInfo.getLog().info("***EvictGlobalInfo.getMemAllocationPlan: mFileAccessCount:{}",
-        mFileAccessCount);
     if (!mFileAccessed) {
       return new HashMap<>(mFileIdToMaxMem);
     }
 
+    MasterInfo.getLog().info(
+        "***EvictGlobalInfo.getMemAllocationPlan: mFileAccessQueue:{}, mFileAccessCount:{}",
+        mFileAccessQueue, mFileAccessCount);
     updateMemSize();
     updateQueue();
     cleanAccessCount();
@@ -92,18 +91,19 @@ public class EvictGlobalInfo {
     }
 
     Map<Integer, Long> fileIdToMaxMem = new HashMap<>();
-    long dsi;
+    // long dsi;
     long allocation;
     int fi;
     int workerNumber = mMasterInfo.getWorkerCount();
     StringBuilder sb = new StringBuilder("***EvictGlobalInfo.getMemAllocationPlan: memory sum="
         + sMEMORYSUM + ", access count sum=" + accessCountSum + ", file size sum=" + fileSizeSum
         + ", workerNumber=" + workerNumber + ", plan=[");
+    double perAccess = 1.0 * sMEMORYSUM / accessCountSum;
     for (int fileId : fileAccessCount.keySet()) {
-      dsi = fileSizes.get(fileId);
+      // dsi = fileSizes.get(fileId);
       fi = fileAccessCount.get(fileId);
-      allocation = (long) (1.0 * fi * sMEMORYSUM / accessCountSum);
-      allocation = Math.min(dsi, allocation);
+      allocation = (long) (fi * perAccess);
+      // allocation = Math.min(dsi, allocation);
       fileIdToMaxMem.put(fileId, allocation / workerNumber);
       sb.append("[" + fileId + ", " + allocation / workerNumber + "],");
     }
@@ -198,17 +198,15 @@ public class EvictGlobalInfo {
     long allocation;
     int fi;
     int workerNumber = 1;
-    double percent;
     StringBuilder sb = new StringBuilder("***EvictGlobalInfo.getMemAllocationPlan: memory sum="
         + sMEMORYSUM + ", access count sum=" + accessCountSum + ", file size sum=" + fileSizeSum
         + ", workerNumber=" + workerNumber + ",plan:");
+    double perAccess = 1.0 * sMEMORYSUM / accessCountSum;
     for (int fileId : fileAccessCount.keySet()) {
       dsi = fileSizes.get(fileId);
       fi = fileAccessCount.get(fileId);
-      // percent = 1.0 * fi * (sMEMORYSUM + A * fileSizeSum) / (dsi * accessCountSum) - A;
-      percent = 1.0 * fi * sMEMORYSUM / dsi / accessCountSum;
-      allocation = (long) (percent * dsi);
-      allocation = Math.max(0, Math.min(dsi, allocation));
+      allocation = (long) (fi * perAccess);
+      // allocation = Math.max(0, Math.min(dsi, allocation));
       fileIdToMaxMem.put(fileId, allocation / workerNumber);
       sb.append("[" + fileId + ", " + allocation / workerNumber + "],");
     }

@@ -34,6 +34,7 @@ import tachyon.client.ReadType;
 import tachyon.client.TachyonFile;
 import tachyon.client.TachyonFS;
 import tachyon.conf.UserConf;
+import tachyon.conf.WorkerConf;
 
 public class HdfsFileInputStream extends InputStream implements Seekable, PositionedReadable {
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
@@ -71,7 +72,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     }
     mTachyonFile.setUFSConf(mHadoopConf);
     try {
-      mTachyonFileInputStream = mTachyonFile.getInStream(ReadType.TRY_CACHE);
+      mTachyonFileInputStream = mTachyonFile.getInStream(ReadType.CACHE);
     } catch (IOException e) {
       LOG.error(e.getMessage());
     }

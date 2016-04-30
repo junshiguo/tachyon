@@ -162,10 +162,8 @@ public final class StorageDir {
         mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
       }
       mBlockSizes.put(blockId, sizeBytes);
-      if (mWorkerStorage != null) {
-        mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
-            sizeBytes); // newly added ugly code
-      }
+      mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
+          sizeBytes); // newly added ugly code
       if (report) {
         mAddedBlockIdList.add(blockId);
       }
@@ -342,10 +340,8 @@ public final class StorageDir {
   private void deleteBlockId(long blockId) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.remove(blockId);
-      if (mWorkerStorage != null) {
-        mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
-            -getBlockSize(blockId)); // newly added ugly code
-      }
+      mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
+          -getBlockSize(blockId)); // newly added ugly code
       mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
       if (mAddedBlockIdList.contains(blockId)) {
         mAddedBlockIdList.remove(blockId);

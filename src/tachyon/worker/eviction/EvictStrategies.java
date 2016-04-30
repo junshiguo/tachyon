@@ -31,6 +31,7 @@ public class EvictStrategies {
    */
   public static EvictStrategy getEvictStrategy(EvictStrategyType strategyType, boolean isLastTier,
       WorkerStorage workerStorage) {
+    WorkerStorage.getLog().info("!!!!!getEvictStrategy: " + strategyType);
     switch (strategyType) {
       case LRU:
         return new EvictLRU(isLastTier);

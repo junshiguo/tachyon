@@ -502,8 +502,8 @@ public class Performance {
           + "<MasterIp> <FileNamePrefix> <WriteBlockSizeInBytes> <BlocksPerFile> "
           + "<DebugMode:true/false> <Threads> <FilesPerThread> <TestCaseNumber> "
           + "<BaseFileNumber>\n" + "1: Files Write AccessFile\n" + "2: Files Read AccessFile\n"
-          + "3: RamFile Write AccessFile \n" + "4: RamFile Read AccessFile \n" + "5: ByteBuffer Write AccessFile \n"
-          + "6: ByteBuffer Read AccessFile \n");
+          + "3: RamFile Write AccessFile \n" + "4: RamFile Read AccessFile \n"
+          + "5: ByteBuffer Write AccessFile \n" + "6: ByteBuffer Read AccessFile \n");
       System.exit(-1);
     }
 

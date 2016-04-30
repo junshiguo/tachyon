@@ -1051,12 +1051,16 @@ public class WorkerStorage {
         } else {
           mFileDistribution.remove(fileId);
         }
+      } else if (diff >= 0) {
+        mFileDistribution.put(fileId, diff);
       }
     }
   }
 
   public Map<Integer, Long> getFileDistributionClone() {
-    return new HashMap<>(mFileDistribution);
+    synchronized (mFileDistribution) {
+      return new HashMap<>(mFileDistribution);
+    }
   }
 
   public void setFileDistribution(Map<Integer, Long> newDistribution) {
@@ -1145,8 +1149,9 @@ public class WorkerStorage {
         mFileTempBlockCountAndUsedBytes.put(fileId, new Pair<>(countDiff, sizeBytesDiff));
       }
       LOG.info(
-          "***WorkerStorage.updateFileTempBlocks: fileid {}, count diff {}, sizeBytes diff {}***",
-          fileId, countDiff, sizeBytesDiff);
+          "***WorkerStorage.updateFileTempBlocks: fileid {}, count diff {},"
+              + " sizeBytes diff {} ({}MB)***",
+          fileId, countDiff, sizeBytesDiff, sizeBytesDiff / 1024 / 1024);
     }
   }
 
@@ -1172,14 +1177,19 @@ public class WorkerStorage {
     if (allocated == null) {
       allocated = 0L;
     }
-    Long used = mFileDistribution.get(fileId);
+    Long used;
+    synchronized (mFileDistribution) {
+      used = mFileDistribution.get(fileId);
+    }
     if (used == null) {
       used = 0L;
     }
     LOG.info(
-        "***WorkerStorage.canCreateBlock: system left {}, used {}, temp max {}, allocated {}***",
-        left, used, tempMax, allocated);
-    if (left > UserConf.get().DEFAULT_BLOCK_SIZE_BYTE || used + tempMax < allocated) {
+        "***WorkerStorage.canCreateBlock: system left {} ({}MB), used {} ({}MB), "
+            + "temp max {} ({}MB), allocated {} ({}MB)***",
+        left, left / 1024 / 1024, used, used / 1024 / 1024, tempMax, tempMax / 1024 / 1024,
+        allocated, allocated / 1024 / 1024);
+    if (left >= UserConf.get().DEFAULT_BLOCK_SIZE_BYTE || used + tempMax < allocated) {
       Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
       if (fileInfo != null) {
         fileInfo.setFirst(fileInfo.getFirst() + 1);
@@ -1188,8 +1198,8 @@ public class WorkerStorage {
         mFileTempBlockCountAndUsedBytes.put(fileId, new Pair<>(1, 0L));
       }
 
-      LOG.info("***WorkerStorage.canCreateBlock: file with id " + fileId + " can create block.***");
-      LOG.info("***{}***", mFileTempBlockCountAndUsedBytes);
+      LOG.info("***WorkerStorage.canCreateBlock: file with id {} can create block. "
+          + "mFileTempBlockCountAndUsedBytes{}***", fileId, mFileTempBlockCountAndUsedBytes);
       return true;
     }
     LOG.info("***WorkerStorage.canCreateBlock: file with id {} failed to preserve block", fileId);
