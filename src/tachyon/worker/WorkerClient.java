@@ -460,4 +460,28 @@ public class WorkerClient implements Closeable {
     }
   }
 
+  public synchronized void cancelTempBlock(int fileId) throws IOException {
+    mustConnect();
+
+    try {
+      mClient.cancelTempBlock(fileId);
+      return;
+    } catch (TException e) {
+      mConnected = false;
+      throw new IOException(e);
+    }
+  }
+
+  public synchronized void clearTempBlockCount(int fileId) throws IOException {
+    mustConnect();
+
+    try {
+      mClient.clearTempBlockCount(fileId);
+      return;
+    } catch (TException e) {
+      mConnected = false;
+      throw new IOException(e);
+    }
+  }
+
 }

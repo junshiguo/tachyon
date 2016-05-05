@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -2604,6 +2605,72 @@ public class MasterInfo extends ImageWriter {
 
   public Map<Integer, Inode> getmFileIdToInodes() {
     return mFileIdToInodes;
+  }
+
+  private Object mAccessCountLock = new Object();
+  private int mAccessCount = 0;
+  private Set<Long> mCacheMissRemote = new HashSet<Long>();
+  private Set<Long> mCacheMissDisk = new HashSet<Long>();
+  private Set<Long> mCacheMissAll = new HashSet<Long>();
+  // private Set<Long> mCacheHit = new HashSet<Long>();
+
+  public List<Integer> user_getAccessCount() {
+    synchronized (mAccessCountLock) {
+      return Arrays.asList(mAccessCount, mCacheMissAll.size(), mCacheMissRemote.size(),
+          mCacheMissDisk.size());
+    }
+  }
+
+  public void user_cleanAccessCount() {
+    synchronized (mAccessCountLock) {
+      mAccessCount = 0;
+      mCacheMissAll.clear();
+      mCacheMissRemote.clear();
+      mCacheMissDisk.clear();
+    }
+  }
+
+  public void user_addAccessOne() {
+    synchronized (mAccessCountLock) {
+      mAccessCount ++;
+    }
+  }
+
+  public void user_addAccess(int count) {
+    synchronized (mAccessCountLock) {
+      mAccessCount += count;
+    }
+  }
+
+  public void user_cacheMiss(long blockId) {
+    synchronized (mAccessCountLock) {
+      mCacheMissAll.add(blockId);
+    }
+  }
+
+  public void user_cacheMissSet(Set<Long> blocks, int type) {
+    synchronized (mAccessCountLock) {
+      if (type == 1) {
+        mCacheMissAll.addAll(blocks);
+      } else if (type == 2) {
+        mCacheMissRemote.addAll(blocks);
+      } else {
+        mCacheMissDisk.addAll(blocks);
+      }
+      LOG.info("*****cache miss: {}, type: {}*****", blocks.size(), type);
+    }
+  }
+
+  public void user_cacheHit(long blockId) {
+    // synchronized (mAccessCountLock) {
+    // mCacheHit.add(blockId);
+    // }
+  }
+
+  public void user_cacheHitSet(Set<Long> blocks) {
+    // synchronized (mAccessCountLock) {
+    // mCacheHit.addAll(blocks);
+    // }
   }
 
 }

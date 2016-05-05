@@ -1,0 +1,10 @@
+mvn install:install-file -Dfile=/home/jsguo/tachyon/client/target/tachyon-client-0.6.4-jar-with-dependencies.jar -DgroupId=org.tachyonproject -DartifactId=tachyon-client -Dversion=0.6.4 -Dpackaging=jar
+
+./build/mvn -DskipTests clean package
+
+sudo sysctl vm.drop_caches=3
+
+ssh jsguo@ec2-54-200-88-106.us-west-2.compute.amazonaws.com
+
+mvn -pl:spark-core_2.10 clean install
+

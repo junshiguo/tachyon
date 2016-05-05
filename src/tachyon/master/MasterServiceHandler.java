@@ -335,4 +335,44 @@ public class MasterServiceHandler implements MasterService.Iface {
   public Map<Integer, Long> worker_getMemAllocationPlan() throws TException {
     return mMasterInfo.worker_getMemAllocationPlan();
   }
+
+  @Override
+  public List<Integer> user_getAccessCount() throws TException {
+    return mMasterInfo.user_getAccessCount();
+  }
+
+  @Override
+  public void user_cleanAccessCount() throws TException {
+    mMasterInfo.user_cleanAccessCount();
+  }
+
+  @Override
+  public void user_addAccessOne() throws TException {
+    mMasterInfo.user_addAccessOne();
+  }
+
+  @Override
+  public void user_addAccess(int count) throws TException {
+    mMasterInfo.user_addAccess(count);
+  }
+
+  @Override
+  public void user_cacheMiss(long blockId) throws TException {
+    mMasterInfo.user_cacheMiss(blockId);
+  }
+
+  @Override
+  public void user_cacheMissSet(Set<Long> blocks, int type) throws TException {
+    mMasterInfo.user_cacheMissSet(blocks, type);
+  }
+
+  @Override
+  public void user_cacheHit(long blockId) throws TException {
+    mMasterInfo.user_cacheHit(blockId);
+  }
+
+  @Override
+  public void user_cacheHitSet(Set<Long> blocks) throws TException {
+    mMasterInfo.user_cacheHitSet(blocks);
+  }
 }

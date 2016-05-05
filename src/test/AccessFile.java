@@ -19,10 +19,14 @@ public class AccessFile {
 
   public static void main(String[] args) {
     if (args.length == 0) {
-      System.out.println("Parameter: access path");
+      System.out.println("Parameter: access path [master]");
       System.exit(0);
     }
-    TachyonURI masterUri = new TachyonURI("tachyon://10.141.211.85:19998");
+    String master = "tachyon://172.31.2.206:19998";
+    if (args.length > 1) {
+      master = args[1];
+    }
+    TachyonURI masterUri = new TachyonURI(master);
     try {
       TachyonFS fs = TachyonFS.get(masterUri);
       fs.accessFile(new TachyonURI(args[0]));

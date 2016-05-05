@@ -20,8 +20,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -54,6 +56,9 @@ public final class StorageDir {
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
   /** Mapping from blockId to blockSize in bytes */
   private final ConcurrentMap<Long, Long> mBlockSizes = new ConcurrentHashMap<Long, Long>();
+  /** added. Mapping from fileId to usedSize in bytes, consistent with mBlockSizes */
+  private final ConcurrentMap<Integer, Long> mFileDistribution =
+      new ConcurrentHashMap<Integer, Long>();
   /** Mapping from blockId to its last access time in milliseconds */
   private final ConcurrentMap<Long, Long> mLastBlockAccessTimeMs =
       new ConcurrentHashMap<Long, Long>();
@@ -194,8 +199,8 @@ public final class StorageDir {
     }
     Long allocatedBytes = mTempBlockAllocatedBytes.remove(blockInfo);
     returnSpace(userId, allocatedBytes - blockSize);
-    mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
-        -allocatedBytes);
+    // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
+    // -allocatedBytes);
     if (mFs.rename(srcPath, dstPath)) {
       addBlockId(blockId, blockSize, false);
       updateUserOwnBytes(userId, -blockSize);
@@ -216,16 +221,16 @@ public final class StorageDir {
   public boolean cancelBlock(long userId, long blockId) throws IOException {
     String filePath = getUserTempFilePath(userId, blockId);
     Pair<Long, Long> key = new Pair<Long, Long>(userId, blockId);
-    boolean exist = mTempBlockAllocatedBytes.containsKey(key);
+    // boolean exist = mTempBlockAllocatedBytes.containsKey(key);
     Long allocatedBytes = mTempBlockAllocatedBytes.remove(key);
     if (allocatedBytes == null) {
       allocatedBytes = 0L;
     }
     returnSpace(userId, allocatedBytes);
-    if (exist) {
-      mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
-          -allocatedBytes);
-    }
+    // if (exist) {
+    // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
+    // -allocatedBytes);
+    // }
     if (!mFs.exists(filePath)) {
       return true;
     } else {
@@ -247,10 +252,15 @@ public final class StorageDir {
     for (Long tempBlockId : tempBlockIdList) {
       Long allocatedBytes =
           mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, tempBlockId));
-      if (allocatedBytes != null) {
-        mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(tempBlockId),
-            -1, allocatedBytes);
-      }
+      // if (allocatedBytes != null) {
+      // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(tempBlockId),
+      // -1, allocatedBytes);
+      // } else {
+      // LOG.info(
+      // "\n!!!find a block with no allocated bytes, " + "which may not be deleted before!!!\n");
+      // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(tempBlockId),
+      // -1, 0);
+      // }
     }
     try {
       mFs.delete(getUserTempPath(userId), true);
@@ -743,8 +753,8 @@ public final class StorageDir {
   public void updateTempBlockAllocatedBytes(long userId, long blockId, long sizeBytes) {
     Pair<Long, Long> blockInfo = new Pair<Long, Long>(userId, blockId);
     // do not add temp block count here. Block count is pre-added.
-    mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), 0,
-        sizeBytes);
+    // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), 0,
+    // sizeBytes);
     Long oldSize = mTempBlockAllocatedBytes.putIfAbsent(blockInfo, sizeBytes);
     if (oldSize != null) {
       while (!mTempBlockAllocatedBytes.replace(blockInfo, oldSize, oldSize + sizeBytes)) {
@@ -784,4 +794,5 @@ public final class StorageDir {
   public Set<Long> getLockedBlocks() {
     return mUserPerLockedBlock.keySet();
   }
+
 }

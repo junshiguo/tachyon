@@ -136,6 +136,17 @@ public class WorkerServiceHandler implements WorkerService.Iface {
 
   @Override
   public boolean canCreateBlock(int fileId) throws TException {
-    return mWorkerStorage.canCreateBlock(fileId);
+    // return mWorkerStorage.canCreateBlock(fileId);
+    return true;
+  }
+
+  @Override
+  public void cancelTempBlock(int fileId) throws TException {
+    // mWorkerStorage.cancelTempBlock(fileId);
+  }
+
+  @Override
+  public void clearTempBlockCount(int fileId) throws TException {
+    // mWorkerStorage.clearTempBlockCount(fileId);
   }
 }

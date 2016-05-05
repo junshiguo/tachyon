@@ -860,4 +860,113 @@ public final class MasterClient implements Closeable {
     return null;
   }
 
+  public synchronized List<Integer> user_getAccessCount() throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        return mClient.user_getAccessCount();
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+    return null;
+  }
+
+  public synchronized void user_cleanAccessCount() throws IOException {
+    if (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_cleanAccessCount();
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_addAccessOne() throws IOException {
+    if (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_addAccessOne();
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_addAccess(int count) throws IOException {
+    if (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_addAccess(count);
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_cacheMiss(long blockId) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_cacheMiss(blockId);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_cacheMissSet(Set<Long> blocks, int type) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_cacheMissSet(blocks, type);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_cacheHit(long blockId) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_cacheHit(blockId);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_cacheHitSet(Set<Long> blocks) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_cacheHitSet(blocks);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
 }

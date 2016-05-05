@@ -122,7 +122,7 @@ public class TachyonFS extends AbstractTachyonFS {
     String authority = mMasterAddress.getHostName() + ":" + mMasterAddress.getPort();
     mRootUri = new TachyonURI(scheme, authority, TachyonURI.SEPARATOR);
   }
-  
+
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
   private final long mUserQuotaUnitBytes = UserConf.get().QUOTA_UNIT_BYTES;
   private final int mUserFailedSpaceRequestLimits = UserConf.get().FAILED_SPACE_REQUEST_LIMITS;
@@ -241,6 +241,10 @@ public class TachyonFS extends AbstractTachyonFS {
   @Override
   public synchronized void close() throws IOException {
     try {
+      mMasterClient.user_cacheMissSet(mCacheMissAll, 1);
+      mMasterClient.user_cacheMissSet(mCacheMissRemote, 2);
+      mMasterClient.user_cacheMissSet(mCacheMissDisk, 3);
+      mMasterClient.user_cacheHitSet(mCacheHit);
       mCloser.close();
     } finally {
       mExecutorService.shutdown();
@@ -999,8 +1003,51 @@ public class TachyonFS extends AbstractTachyonFS {
       throw new IOException("Uri " + uri + " is invalid.");
     }
   }
-  
+
   public synchronized boolean canCreateBlock(int fileId) throws IOException {
     return mWorkerClient.canCreateBlock(fileId);
   }
+
+  public synchronized List<Integer> getAccessCount() throws IOException {
+    return mMasterClient.user_getAccessCount();
+  }
+
+  public synchronized void cleanAccessCount() throws IOException {
+    mMasterClient.user_cleanAccessCount();
+  }
+
+  public synchronized void addAccess(int count) throws IOException {
+    if (count == 1) {
+      mMasterClient.user_addAccessOne();
+    } else {
+      mMasterClient.user_addAccess(count);
+    }
+  }
+
+  public Set<Long> mCacheMissAll = new HashSet<Long>();
+  public Set<Long> mCacheMissRemote = new HashSet<Long>();
+  public Set<Long> mCacheMissDisk = new HashSet<Long>();
+  public Set<Long> mCacheHit = new HashSet<Long>();
+
+  public synchronized void cacheMiss(long blockId, int type) {
+    if (type == 2) {
+      mCacheMissRemote.add(blockId);
+    } else if (type == 3) {
+      mCacheMissDisk.add(blockId);
+    }
+    mCacheMissAll.add(blockId);
+  }
+
+  public synchronized void cacheHit(long blockId) {
+    mCacheHit.add(blockId);
+  }
+
+  public synchronized void cancelTempBlock(int fileId) throws IOException {
+    mWorkerClient.cancelTempBlock(fileId);
+  }
+
+  public synchronized void clearTempBlockCount(int fileId) throws IOException {
+    mWorkerClient.clearTempBlockCount(fileId);
+  }
+
 }

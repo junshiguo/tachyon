@@ -429,6 +429,8 @@ public class TachyonFile implements Comparable<TachyonFile> {
         FileChannel localFileChannel = closer.register(localFile.getChannel());
         final ByteBuffer buf = localFileChannel.map(FileChannel.MapMode.READ_ONLY, offset, len);
         mTachyonFS.accessLocalBlock(blockId);
+        // newlyadded
+        mTachyonFS.cacheHit(blockId);
         return new TachyonByteBuffer(mTachyonFS, buf, blockId, blockLockId);
       } catch (FileNotFoundException e) {
         LOG.info(localFileName + " is not on local disk.");
@@ -549,5 +551,9 @@ public class TachyonFile implements Comparable<TachyonFile> {
     } catch (IOException e) {
       throw new RuntimeException("File does not exist anymore: " + mFileId);
     }
+  }
+
+  public void addAccess(int count) throws IOException {
+    mTachyonFS.addAccess(count);
   }
 }

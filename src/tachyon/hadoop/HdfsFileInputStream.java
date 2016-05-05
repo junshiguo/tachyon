@@ -80,6 +80,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
 
   @Override
   public void close() throws IOException {
+    mTFS.addAccess(1);
     if (mTachyonFileInputStream != null) {
       mTachyonFileInputStream.close();
     }
@@ -242,7 +243,14 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     }
 
     if (mTachyonFileInputStream != null) {
-      mTachyonFileInputStream.seek(pos);
+      try {
+        mTachyonFileInputStream.seek(pos);
+      } catch (IOException e) {
+        mTachyonFileInputStream = null;
+        getHdfsInputStream(pos);
+        LOG.error(
+            "#####HdfsFileInputStream.seek failed." + " Possibly cannot connect to worker#####");
+      }
     } else {
       getHdfsInputStream(pos);
     }

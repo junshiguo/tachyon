@@ -239,8 +239,8 @@ public class StorageTier {
    * @throws IOException
    */
   public StorageDir requestSpace(long userId, long requestBytes, Set<Integer> pinList,
-      List<Long> removedBlockIds) throws IOException {
-    return requestSpace(mDirs, userId, requestBytes, pinList, removedBlockIds);
+      List<Long> removedBlockIds, int fileId) throws IOException {
+    return requestSpace(mDirs, userId, requestBytes, pinList, removedBlockIds, fileId);
   }
 
   /**
@@ -255,13 +255,13 @@ public class StorageTier {
    * @throws IOException
    */
   public boolean requestSpace(StorageDir storageDir, long userId, long requestBytes,
-      Set<Integer> pinList, List<Long> removedBlockIds) throws IOException {
+      Set<Integer> pinList, List<Long> removedBlockIds, int fileId) throws IOException {
     if (StorageDirId.getStorageLevel(storageDir.getStorageDirId()) != mLevel) {
       return false;
     }
     StorageDir[] dirs = new StorageDir[1];
     dirs[0] = storageDir;
-    return storageDir == requestSpace(dirs, userId, requestBytes, pinList, removedBlockIds);
+    return storageDir == requestSpace(dirs, userId, requestBytes, pinList, removedBlockIds, fileId);
   }
 
   /**
@@ -277,7 +277,8 @@ public class StorageTier {
    */
   // TODO make block eviction asynchronous, then no need to be synchronized
   private synchronized StorageDir requestSpace(StorageDir[] dirs, long userId,
-      long requestSizeBytes, Set<Integer> pinList, List<Long> removedBlockIds) throws IOException {
+      long requestSizeBytes, Set<Integer> pinList, List<Long> removedBlockIds, int fileId)
+          throws IOException {
     StorageDir dirSelected = mSpaceAllocator.getStorageDir(dirs, userId, requestSizeBytes);
     if (dirSelected != null) {
       return dirSelected;
@@ -286,7 +287,7 @@ public class StorageTier {
     if (mSpaceAllocator.fitInPossible(dirs, requestSizeBytes)) {
       for (int attempt = 0; attempt < FAILED_SPACE_REQUEST_LIMITS; attempt ++) {
         Pair<StorageDir, List<BlockInfo>> evictInfo =
-            mBlockEvictor.getDirCandidate(dirs, pinList, requestSizeBytes);
+            mBlockEvictor.getDirCandidate(dirs, pinList, requestSizeBytes, fileId);
         if (evictInfo == null) {
           return null;
         }
@@ -301,7 +302,7 @@ public class StorageTier {
               removedBlockIds.add(blockId);
             } else {
               StorageDir dstDir = mNextTier.requestSpace(Users.MIGRATE_DATA_USER_ID,
-                  blockInfo.getSize(), pinList, removedBlockIds);
+                  blockInfo.getSize(), pinList, removedBlockIds, fileId);
               dir.moveBlock(blockId, dstDir);
             }
             LOG.debug("Evicted block Id:{}" + blockId);

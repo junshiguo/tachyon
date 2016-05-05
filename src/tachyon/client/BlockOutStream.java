@@ -132,6 +132,7 @@ public class BlockOutStream extends OutStream {
       mCloser.close();
       mClosed = true;
       mTachyonFS.cancelBlock(mBlockId);
+      // mTachyonFS.cancelTempBlock(tachyon.master.BlockInfo.computeInodeId(mBlockId));
       LOG.info(String.format("Canceled output of block. blockId(%d) path(%s)", mBlockId,
           mLocalFilePath));
     }

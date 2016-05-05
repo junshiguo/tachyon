@@ -109,6 +109,11 @@ public class RemoteBlockInStream extends BlockInStream {
    */
   private static final int MAX_REMOTE_READ_ATTEMPTS = 2;
 
+  private static final int TYPE_ALL = 1;
+  private static final int TYPE_REMOTE_MEMORY = 2;
+  private static final int TYPE_UFS = 3;
+  private int mRemoteType = 1;
+
   /**
    * @param file the file the block belongs to
    * @param readType the InStream's read type
@@ -163,6 +168,10 @@ public class RemoteBlockInStream extends BlockInStream {
 
   @Override
   public void close() throws IOException {
+    mTachyonFS.cacheMiss(mBlockInfo.blockId, TYPE_ALL);
+    if (mRemoteType != TYPE_ALL) {
+      mTachyonFS.cacheMiss(mBlockInfo.blockId, mRemoteType);
+    }
     if (mClosed) {
       return;
     }
@@ -409,6 +418,8 @@ public class RemoteBlockInStream extends BlockInStream {
       }
       mCheckpointPos += skipped;
     }
+
+    mRemoteType = TYPE_UFS;
     return true;
   }
 
@@ -451,6 +462,7 @@ public class RemoteBlockInStream extends BlockInStream {
     for (int i = 0; i < MAX_REMOTE_READ_ATTEMPTS; i ++) {
       mCurrentBuffer = readRemoteByteBuffer(mTachyonFS, mBlockInfo, mBufferStartPos, length);
       if (mCurrentBuffer != null) {
+        mRemoteType = TYPE_REMOTE_MEMORY;
         return true;
       }
       // The read failed, refresh the block info and try again

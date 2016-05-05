@@ -383,8 +383,4 @@ service WorkerService {
   void master_freeBlocks(1: list<i64> blockIds)
 
   bool canCreateBlock(1: i32 fileId)
-
-  void cancelTempBlock(1: i32 fileId)
-
-  void clearTempBlockCount(1: i32 fileId)
 }

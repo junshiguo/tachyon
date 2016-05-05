@@ -10,7 +10,11 @@ import tachyon.util.UfsUtils;
 public class OpenHdfsFile {
 
   public static void main(String[] args) throws IOException {
-    TachyonURI masterUri = new TachyonURI("tachyon://10.141.211.85:19998");
+    String master = "tachyon://172.31.2.206:19998";
+    if (args.length > 1) {
+      master = args[1];
+    }
+    TachyonURI masterUri = new TachyonURI(master);
     TachyonURI filepath = new TachyonURI(args[0]);
 
     TachyonFS tfs = TachyonFS.get(masterUri);
@@ -19,7 +23,7 @@ public class OpenHdfsFile {
       TachyonURI ufsUri = new TachyonURI(mUnderFSAddress);
       TachyonURI ufsAddrPath =
           new TachyonURI(ufsUri.getScheme(), ufsUri.getAuthority(), filepath.getPath());
-      UfsUtils.loadUnderFs(tfs, filepath, ufsAddrPath, new PrefixList(null));
+      UfsUtils.loadUnderFs(tfs, filepath.getParent(), ufsAddrPath, new PrefixList(null));
     }
   }
 
