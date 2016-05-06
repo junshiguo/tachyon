@@ -2634,6 +2634,7 @@ public class MasterInfo extends ImageWriter {
     }
   }
 
+  @Deprecated
   public void user_addAccessOne() {
     synchronized (mAccessCountLock) {
       mAccessCount ++;
@@ -2647,18 +2648,21 @@ public class MasterInfo extends ImageWriter {
   }
 
   public void user_addBlockReadSourceSet(Set<Long> blocks, int source) {
-    if (source == BlockAccessInfo.READ_MEMORY) {
-      mCacheHit.addAll(blocks);
-    } else {
-      mCacheMissAll.addAll(blocks);
-      if (source == BlockAccessInfo.READ_REMOTE) {
+    synchronized (mAccessCountLock) {
+      if (source == BlockAccessInfo.READ_MEMORY) {
+        mCacheHit.addAll(blocks);
+      } else if (source == BlockAccessInfo.READ_REMOTE) {
         mCacheMissRemote.addAll(blocks);
+        mCacheMissAll.addAll(blocks);
       } else if (source == BlockAccessInfo.READ_UFS) {
         mCacheMissDisk.addAll(blocks);
+        mCacheMissAll.addAll(blocks);
       }
+      LOG.info(" ###user_addBlockReadSourceSet: source {}, blocks {}###   ", source, blocks);
     }
   }
 
+  @Deprecated
   public void user_cacheMissSet(Set<Long> blocks, int type) {
     synchronized (mAccessCountLock) {
       if (type == 1) {
@@ -2704,6 +2708,12 @@ public class MasterInfo extends ImageWriter {
   public Set<UserBlockAccessInfo> user_getBlockAccessInfo() {
     synchronized (mBlockAccessInfos) {
       return new HashSet<UserBlockAccessInfo>(mBlockAccessInfos);
+    }
+  }
+
+  public Map<Integer, Integer> user_getFileAccessCount() {
+    synchronized (mRoot) {
+      return mEvictGlobalInfo.getFileAccessCount();
     }
   }
 

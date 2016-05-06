@@ -19,7 +19,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.rmi.Remote;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -49,7 +48,6 @@ import tachyon.thrift.ClientRawTableInfo;
 import tachyon.thrift.ClientWorkerInfo;
 import tachyon.thrift.InvalidPathException;
 import tachyon.thrift.UserBlockAccessInfo;
-import tachyon.thrift.WorkerService.AsyncProcessor.accessBlock;
 import tachyon.util.CommonUtils;
 import tachyon.util.ThreadFactoryUtils;
 import tachyon.worker.WorkerClient;
@@ -1056,14 +1054,21 @@ public class TachyonFS extends AbstractTachyonFS {
 
   private Map<Long, BlockAccessInfo> mAccessedBlocksInfo = new HashMap<Long, BlockAccessInfo>();
 
-  public synchronized void addBlockAccessInfo(int fileId, long blockId, long blockSize) {
+  public synchronized void addBlockAccessInfo(int fileId, long blockId, long blockSize,
+      int source) {
     mAccessedBlocksInfo.put(blockId,
-        new BlockAccessInfo(fileId, blockId, blockSize, System.currentTimeMillis()));
+        new BlockAccessInfo(fileId, blockId, blockSize, System.currentTimeMillis(), source));
   }
 
-  public synchronized void closeBlockAccessInfo(long blockId, int type) {
+  public synchronized void closeBlockAccessInfo(long blockId) {
     if (mAccessedBlocksInfo.containsKey(blockId)) {
-      mAccessedBlocksInfo.get(blockId).setClose(type);
+      mAccessedBlocksInfo.get(blockId).setClose();
+    }
+  }
+
+  public synchronized void setBlockAccessInfoSource(long blockId, int source) {
+    if (mAccessedBlocksInfo.containsKey(blockId)) {
+      mAccessedBlocksInfo.get(blockId).setReadSource(source);
     }
   }
 

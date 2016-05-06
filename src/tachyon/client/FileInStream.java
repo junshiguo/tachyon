@@ -83,8 +83,12 @@ public class FileInStream extends InStream {
     mClosed = true;
   }
 
-  private int getCurrentBlockIndex() {
+  public int getCurrentBlockIndex() {
     return (int) (mCurrentPosition / mBlockCapacity);
+  }
+
+  public long getCurrentBlockId() {
+    return tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, getCurrentBlockIndex());
   }
 
   @Override

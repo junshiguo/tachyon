@@ -17,17 +17,21 @@ public class BlockAccessInfo {
 
   private boolean mClosed = false;
 
-  public BlockAccessInfo(int fileId, long blockId, long blockSize, long timestamp) {
+  public BlockAccessInfo(int fileId, long blockId, long blockSize, long timestamp, int source) {
     mFileId = fileId;
     mBlockId = blockId;
     mSizeByte = blockSize;
     mOpenTime = timestamp;
+    this.mReadSource = source;
   }
 
-  public synchronized void setClose(int type) {
+  public synchronized void setReadSource(int source) {
+    mReadSource = source;
+  }
+
+  public synchronized void setClose() {
     mCloseTime = System.currentTimeMillis();
     mDuration = mCloseTime - mOpenTime;
-    mReadSource = type;
     mClosed = true;
   }
 

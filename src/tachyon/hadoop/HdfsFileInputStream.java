@@ -29,6 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import tachyon.Constants;
+import tachyon.client.BlockInStream;
+import tachyon.client.FileInStream;
 import tachyon.client.InStream;
 import tachyon.client.ReadType;
 import tachyon.client.TachyonFile;
@@ -40,6 +42,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
 
   private long mCurrentPosition;
+  private long mBlockSizeBytes;
   private TachyonFS mTFS;
   private int mFileId;
   private Path mHdfsPath;
@@ -54,6 +57,9 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
   private int mBufferLimit = 0;
   private int mBufferPosition = 0;
   private byte[] mBuffer = new byte[UserConf.get().FILE_BUFFER_BYTES * 4];
+
+  private boolean mBlockIdSet = false;
+  private long mBlockIdForAnalysis = -1;
 
   public HdfsFileInputStream(TachyonFS tfs, int fileId, Path hdfsPath, Configuration conf,
       int bufferSize) throws IOException {
@@ -70,6 +76,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
       throw new FileNotFoundException(
           "File " + hdfsPath + " with FID " + fileId + " is not found.");
     }
+    mBlockSizeBytes = mTachyonFile.getBlockSizeByte();
     mTachyonFile.setUFSConf(mHadoopConf);
     try {
       mTachyonFileInputStream = mTachyonFile.getInStream(ReadType.CACHE);
@@ -81,14 +88,12 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
   @Override
   public void close() throws IOException {
     mTFS.addAccess(1);
+    // if (mBlockIdForAnalysis != -1) {
+    // mTFS.closeBlockAccessInfo(mBlockIdForAnalysis);
+    // }
+    // mTFS.closeBlockAccessInfo(tachyon.master.BlockInfo.computeBlockId(mFileId,
+    // ((int) ((mCurrentPosition - 1) / mBlockSizeBytes))));
     if (mTachyonFileInputStream != null) {
-      // if (mTachyonFileInputStream.getReadSource() != -1
-      // && mTachyonFileInputStream.getBlockIdForAnalysis() != -1) {
-      // long blockId = mTachyonFileInputStream.getBlockIdForAnalysis();
-      // int readsource = mTachyonFileInputStream.getReadSource();
-      // mTFS.addBlockReadSource(blockId, readsource);
-      // mTFS.closeBlockAccessInfo(blockId, readsource);
-      // }
       mTachyonFileInputStream.close();
     }
     if (mHdfsInputStream != null) {
@@ -181,6 +186,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     if (mTachyonFileInputStream != null) {
       try {
         mTachyonFileInputStream.seek(position);
+        setBlockId();
         ret = mTachyonFileInputStream.read(buffer, offset, length);
         return ret;
       } finally {
@@ -252,6 +258,7 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
     if (mTachyonFileInputStream != null) {
       try {
         mTachyonFileInputStream.seek(pos);
+        setBlockId();
       } catch (IOException e) {
         mTachyonFileInputStream = null;
         getHdfsInputStream(pos);
@@ -271,5 +278,18 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
   @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
     throw new IOException("Not supported");
+  }
+
+  private void setBlockId() {
+    if (!mBlockIdSet) {
+      if (mTachyonFileInputStream instanceof FileInStream
+          && ((FileInStream) mTachyonFileInputStream).getCurrentBlockIndex() != -1) {
+        mBlockIdForAnalysis = ((FileInStream) mTachyonFileInputStream).getCurrentBlockId();
+        mBlockIdSet = true;
+      } else if (mTachyonFileInputStream instanceof BlockInStream) {
+        mBlockIdForAnalysis = ((BlockInStream) mTachyonFileInputStream).getBlockId();
+        mBlockIdSet = true;
+      }
+    }
   }
 }

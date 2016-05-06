@@ -22,10 +22,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,6 +51,7 @@ import tachyon.util.CommonUtils;
 import tachyon.worker.BlockHandler;
 import tachyon.worker.SpaceCounter;
 import tachyon.worker.WorkerStorage;
+import tachyon.worker.eviction.LFUUnit;
 
 /**
  * Stores and manages block files in storage's directory in different storage systems.
@@ -93,6 +97,9 @@ public final class StorageDir {
    * Newly added!!! It's not good to expose workerStorage in StorageDir
    */
   private final WorkerStorage mWorkerStorage;
+  /** For LFU */
+  private final ConcurrentMap<Long, Integer> mBlockAccessCount =
+      new ConcurrentHashMap<Long, Integer>();
 
   /**
    * Create a new StorageDir.
@@ -133,6 +140,7 @@ public final class StorageDir {
     synchronized (mLastBlockAccessTimeMs) {
       if (containsBlock(blockId)) {
         mLastBlockAccessTimeMs.put(blockId, System.currentTimeMillis());
+
         LOG.info("***StorageDir.accessBlock: access block {}***", blockId);
       }
     }

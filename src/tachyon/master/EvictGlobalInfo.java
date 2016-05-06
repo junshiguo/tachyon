@@ -115,6 +115,10 @@ public class EvictGlobalInfo {
     return fileIdToMaxMem;
   }
 
+  public synchronized Map<Integer, Integer> getFileAccessCount() {
+    return new HashMap<>(mFileAccessCount);
+  }
+
   /**
    * update queue to ensure that file sizes sum no more than QUEUE_SIZE
    */

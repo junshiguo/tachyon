@@ -3,8 +3,15 @@ package util;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import java.util.Set;
 
 import tachyon.TachyonURI;
@@ -32,10 +39,11 @@ public class GatherResults {
     BufferedWriter writer = new BufferedWriter(new FileWriter(outpath, true));
     writer.write("###START\t" + index + "###\n");
 
-    List<Integer> list = tfs.getAccessCount();
-    writer.write("#access\thit\tmiss\treadRemote\treadUfs\n");
-    writer.write(list.get(0) + "\t" + list.get(1) + "\t" + list.get(2) + "\t" + list.get(3) + "\t"
-        + list.get(4) + "\n");
+    // List<Integer> list = tfs.getAccessCount();
+    // writer.write("#access\thit\tmiss\treadRemote\treadUfs\n");
+    // writer.write(list.get(0) + "\t" + list.get(1) + "\t" + list.get(2) + "\t" + list.get(3) +
+    // "\t"
+    // + list.get(4) + "\n");
 
     writer.write("#memory percent and consumption\n");
     List<ClientFileInfo> files = tfs.listStatus(new TachyonURI(args[1]));
@@ -45,23 +53,55 @@ public class GatherResults {
       writer.newLine();
     }
 
+    // count
     Set<UserBlockAccessInfo> infos = tfs.getBlockAccessInfoFromMaster();
+    Map<Integer, Integer> counts = new HashMap<>();
     Set<Long> blockIds = new HashSet<Long>();
-    writer.write("#details\t" + infos.size() + "\n");
     for (UserBlockAccessInfo info : infos) {
       blockIds.add(info.blockId);
-      writer.write(info.toString());
-      writer.newLine();
+      Integer count = counts.get(info.readSource);
+      if (count == null) {
+        count = 0;
+      }
+      count ++;
+      counts.put(info.readSource, count);
     }
 
-    writer.write("##details\t" + infos.size() + "\t" + blockIds.size() + "\n");
+    writer.write("#counts total\tunique\treadMem\treadRemote\treadUfs\n");
+    writer.write(infos.size() + "\t" + blockIds.size() + "\t" + counts.get(1) + "\t" + counts.get(2)
+        + "\t" + counts.get(3) + "\n");
+
+    writer.write(
+        "#details (fileId,blockId,sizeBytes,openTimeMs,closeTimeMs,duration,readSource(1:local,2:remote,3:ufs))");
+    writer.newLine();
     for (UserBlockAccessInfo info : infos) {
       writer.write(info.fileId + "\t" + info.blockId + "\t" + info.sizeByte + "\t" + info.openTimeMs
           + "\t" + info.closeTimeMs + "\t" + info.duration + "\t" + info.readSource);
       writer.newLine();
     }
 
-    writer.write("###END###");
+    //
+    // ArrayList<UserBlockAccessInfo> list2 = new ArrayList<>(infos);
+    // java.util.Collections.sort(list2, new Comparator<UserBlockAccessInfo>() {
+    //
+    // @Override
+    // public int compare(UserBlockAccessInfo o1, UserBlockAccessInfo o2) {
+    // return (int) (o2.duration - o1.duration);
+    // }
+    // });
+    // Set<Long> blockIds2 = new HashSet<>();
+    // int count = 0;
+    // for (UserBlockAccessInfo info : list2) {
+    // writer.write(info.toString());
+    // writer.newLine();
+    // blockIds2.add(info.blockId);
+    // count ++;
+    // if (blockIds2.size() == 99) {
+    // break;
+    // }
+    // }
+    // writer.write("###" + count + "###\n");
+    writer.write("###END###\n");
     writer.close();
   }
 }

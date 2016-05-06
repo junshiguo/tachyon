@@ -403,8 +403,7 @@ public class MasterServiceHandler implements MasterService.Iface {
 
   @Override
   public Map<Integer, Integer> worker_getFileAccessTimes() throws TException {
-    // TODO for LFU
-    return null;
+    return mMasterInfo.user_getFileAccessCount();
   }
 
   @Override

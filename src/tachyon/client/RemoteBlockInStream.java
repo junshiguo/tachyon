@@ -144,9 +144,9 @@ public class RemoteBlockInStream extends BlockInStream {
 
     mTryCreateBlock = true;
 
-    mTachyonFS.addBlockAccessInfo(file.mFileId, mBlockInfo.blockId, mBlockInfo.length);
+    mTachyonFS.addBlockAccessInfo(file.mFileId, mBlockInfo.blockId, mBlockInfo.length,
+        BlockAccessInfo.READ_REMOTE);
     mReadSource = BlockAccessInfo.READ_REMOTE;
-    mBlockIdForAnalysis = mBlockInfo.blockId;
   }
 
   /**
@@ -168,7 +168,7 @@ public class RemoteBlockInStream extends BlockInStream {
   @Override
   public void close() throws IOException {
     mTachyonFS.addBlockReadSource(mBlockInfo.blockId, mReadSource);
-    mTachyonFS.closeBlockAccessInfo(mBlockInfo.blockId, mReadSource);
+    mTachyonFS.closeBlockAccessInfo(mBlockInfo.blockId);
     if (mClosed) {
       return;
     }
@@ -416,6 +416,7 @@ public class RemoteBlockInStream extends BlockInStream {
       mCheckpointPos += skipped;
     }
 
+    mTachyonFS.setBlockAccessInfoSource(mBlockInfo.blockId, BlockAccessInfo.READ_UFS);
     mReadSource = BlockAccessInfo.READ_UFS;
     return true;
   }

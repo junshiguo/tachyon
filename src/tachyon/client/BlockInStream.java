@@ -17,8 +17,6 @@ package tachyon.client;
 
 import java.io.IOException;
 
-import tachyon.worker.WorkerStorage;
-
 /**
  * <code>InputStream</code> interface implementation of TachyonFile. It can only be gotten by
  * calling the methods in <code>tachyon.client.TachyonFile</code>, but can not be initialized by the
@@ -77,5 +75,9 @@ public abstract class BlockInStream extends InStream {
   BlockInStream(TachyonFile file, ReadType readType, int blockIndex) throws IOException {
     super(file, readType);
     mBlockIndex = blockIndex;
+  }
+
+  public long getBlockId() {
+    return tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, mBlockIndex);
   }
 }
