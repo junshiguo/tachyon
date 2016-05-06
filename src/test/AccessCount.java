@@ -39,6 +39,7 @@ public class AccessCount {
     try {
       TachyonFS fs = TachyonFS.get(masterUri);
       fs.cleanAccessCount();
+      fs.cleanBlockAccessInfoForMaster();
     } catch (IOException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();

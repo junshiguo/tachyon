@@ -82,6 +82,13 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
   public void close() throws IOException {
     mTFS.addAccess(1);
     if (mTachyonFileInputStream != null) {
+      // if (mTachyonFileInputStream.getReadSource() != -1
+      // && mTachyonFileInputStream.getBlockIdForAnalysis() != -1) {
+      // long blockId = mTachyonFileInputStream.getBlockIdForAnalysis();
+      // int readsource = mTachyonFileInputStream.getReadSource();
+      // mTFS.addBlockReadSource(blockId, readsource);
+      // mTFS.closeBlockAccessInfo(blockId, readsource);
+      // }
       mTachyonFileInputStream.close();
     }
     if (mHdfsInputStream != null) {

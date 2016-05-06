@@ -56,9 +56,6 @@ public final class StorageDir {
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
   /** Mapping from blockId to blockSize in bytes */
   private final ConcurrentMap<Long, Long> mBlockSizes = new ConcurrentHashMap<Long, Long>();
-  /** added. Mapping from fileId to usedSize in bytes, consistent with mBlockSizes */
-  private final ConcurrentMap<Integer, Long> mFileDistribution =
-      new ConcurrentHashMap<Integer, Long>();
   /** Mapping from blockId to its last access time in milliseconds */
   private final ConcurrentMap<Long, Long> mLastBlockAccessTimeMs =
       new ConcurrentHashMap<Long, Long>();
@@ -163,12 +160,13 @@ public final class StorageDir {
   private void addBlockId(long blockId, long sizeBytes, long accessTimeMs, boolean report) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.put(blockId, accessTimeMs);
+      int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
       if (mBlockSizes.containsKey(blockId)) {
         mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
+        mWorkerStorage.updateFileDistribution(fileId, -mBlockSizes.get(blockId));
       }
       mBlockSizes.put(blockId, sizeBytes);
-      mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
-          sizeBytes); // newly added ugly code
+      mWorkerStorage.updateFileDistribution(fileId, sizeBytes); // newly added ugly code
       if (report) {
         mAddedBlockIdList.add(blockId);
       }

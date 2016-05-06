@@ -44,6 +44,7 @@ import javax.swing.plaf.synth.SynthRadioButtonMenuItemUI;
 
 import org.apache.commons.collections.bag.SynchronizedBag;
 import org.apache.thrift.TException;
+import org.apache.zookeeper.server.quorum.Election;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +62,7 @@ import tachyon.PrefixList;
 import tachyon.TachyonURI;
 import tachyon.UnderFileSystem;
 import tachyon.UnderFileSystem.SpaceType;
+import tachyon.client.BlockAccessInfo;
 import tachyon.conf.CommonConf;
 import tachyon.conf.MasterConf;
 import tachyon.thrift.BlockInfoException;
@@ -80,6 +82,7 @@ import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TableColumnException;
 import tachyon.thrift.TableDoesNotExistException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.UserBlockAccessInfo;
 import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 import tachyon.worker.WorkerClientRemote;
@@ -2612,12 +2615,12 @@ public class MasterInfo extends ImageWriter {
   private Set<Long> mCacheMissRemote = new HashSet<Long>();
   private Set<Long> mCacheMissDisk = new HashSet<Long>();
   private Set<Long> mCacheMissAll = new HashSet<Long>();
-  // private Set<Long> mCacheHit = new HashSet<Long>();
+  private Set<Long> mCacheHit = new HashSet<Long>();
 
   public List<Integer> user_getAccessCount() {
     synchronized (mAccessCountLock) {
-      return Arrays.asList(mAccessCount, mCacheMissAll.size(), mCacheMissRemote.size(),
-          mCacheMissDisk.size());
+      return Arrays.asList(mAccessCount, mCacheHit.size(), mCacheMissAll.size(),
+          mCacheMissRemote.size(), mCacheMissDisk.size());
     }
   }
 
@@ -2627,6 +2630,7 @@ public class MasterInfo extends ImageWriter {
       mCacheMissAll.clear();
       mCacheMissRemote.clear();
       mCacheMissDisk.clear();
+      mCacheHit.clear();
     }
   }
 
@@ -2642,9 +2646,16 @@ public class MasterInfo extends ImageWriter {
     }
   }
 
-  public void user_cacheMiss(long blockId) {
-    synchronized (mAccessCountLock) {
-      mCacheMissAll.add(blockId);
+  public void user_addBlockReadSourceSet(Set<Long> blocks, int source) {
+    if (source == BlockAccessInfo.READ_MEMORY) {
+      mCacheHit.addAll(blocks);
+    } else {
+      mCacheMissAll.addAll(blocks);
+      if (source == BlockAccessInfo.READ_REMOTE) {
+        mCacheMissRemote.addAll(blocks);
+      } else if (source == BlockAccessInfo.READ_UFS) {
+        mCacheMissDisk.addAll(blocks);
+      }
     }
   }
 
@@ -2661,16 +2672,39 @@ public class MasterInfo extends ImageWriter {
     }
   }
 
-  public void user_cacheHit(long blockId) {
-    // synchronized (mAccessCountLock) {
-    // mCacheHit.add(blockId);
-    // }
-  }
 
   public void user_cacheHitSet(Set<Long> blocks) {
-    // synchronized (mAccessCountLock) {
-    // mCacheHit.addAll(blocks);
-    // }
+    synchronized (mAccessCountLock) {
+      mCacheHit.addAll(blocks);
+    }
+  }
+
+  public long user_getMemoryConsumption(String path) throws InvalidPathException, IOException {
+    Inode inode = getInode(new TachyonURI(path));
+    if (inode.isDirectory()) {
+      throw new IOException(path + " is a folder!");
+    }
+    return ((InodeFile) inode).getMemoryConsumptionBytes();
+  }
+
+  private Set<UserBlockAccessInfo> mBlockAccessInfos = new HashSet<UserBlockAccessInfo>();
+
+  public void user_addBlockAccessInfo(Set<UserBlockAccessInfo> blocks) {
+    synchronized (mBlockAccessInfos) {
+      mBlockAccessInfos.addAll(blocks);
+    }
+  }
+
+  public void user_cleanBlockAccessInfo() {
+    synchronized (mBlockAccessInfos) {
+      mBlockAccessInfos.clear();
+    }
+  }
+
+  public Set<UserBlockAccessInfo> user_getBlockAccessInfo() {
+    synchronized (mBlockAccessInfos) {
+      return new HashSet<UserBlockAccessInfo>(mBlockAccessInfos);
+    }
   }
 
 }

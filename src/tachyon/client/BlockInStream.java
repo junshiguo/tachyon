@@ -53,10 +53,8 @@ public abstract class BlockInStream extends InStream {
    */
   public static BlockInStream get(TachyonFile tachyonFile, ReadType readType, int blockIndex,
       Object ufsConf) throws IOException {
-    // tachyonFile.addAccess(1);
     TachyonByteBuffer buf = tachyonFile.readLocalByteBuffer(blockIndex);
     if (buf != null) {
-      // tachyonFile.addHit(1);
       if (readType.isPromote()) {
         tachyonFile.promoteBlock(blockIndex);
       }

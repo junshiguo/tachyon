@@ -48,6 +48,7 @@ import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TableColumnException;
 import tachyon.thrift.TableDoesNotExistException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.UserBlockAccessInfo;
 import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 
@@ -358,7 +359,7 @@ public class MasterServiceHandler implements MasterService.Iface {
 
   @Override
   public void user_cacheMiss(long blockId) throws TException {
-    mMasterInfo.user_cacheMiss(blockId);
+    // mMasterInfo.user_cacheMiss(blockId);
   }
 
   @Override
@@ -368,11 +369,46 @@ public class MasterServiceHandler implements MasterService.Iface {
 
   @Override
   public void user_cacheHit(long blockId) throws TException {
-    mMasterInfo.user_cacheHit(blockId);
+    // mMasterInfo.user_cacheHit(blockId);
   }
 
   @Override
   public void user_cacheHitSet(Set<Long> blocks) throws TException {
     mMasterInfo.user_cacheHitSet(blocks);
+  }
+
+  @Override
+  public long user_getMemoryConsumptionBytes(String path) throws TException {
+    try {
+      return mMasterInfo.user_getMemoryConsumption(path);
+    } catch (IOException e) {
+      throw new TException(e);
+    }
+  }
+
+  @Override
+  public void user_addBlockAccessInfo(Set<UserBlockAccessInfo> accessedBlocks) throws TException {
+    mMasterInfo.user_addBlockAccessInfo(accessedBlocks);
+  }
+
+  @Override
+  public void user_cleanBlockAccessInfo() throws TException {
+    mMasterInfo.user_cleanBlockAccessInfo();
+  }
+
+  @Override
+  public Set<UserBlockAccessInfo> user_getBlockAccessInfo() throws TException {
+    return mMasterInfo.user_getBlockAccessInfo();
+  }
+
+  @Override
+  public Map<Integer, Integer> worker_getFileAccessTimes() throws TException {
+    // TODO for LFU
+    return null;
+  }
+
+  @Override
+  public void user_addBlockReadSourceSet(Set<Long> blocks, int source) throws TException {
+    mMasterInfo.user_addBlockReadSourceSet(blocks, source);
   }
 }

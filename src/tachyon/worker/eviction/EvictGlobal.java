@@ -1,6 +1,7 @@
 package tachyon.worker.eviction;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,9 @@ public class EvictGlobal implements EvictStrategy {
     if (memAllocation == null) {
       return null;
     }
-    WorkerStorage.getLog().info("***EvictGlobal: getMemAllocationPlan: {}***", memAllocation);
+    WorkerStorage.getLog().info(
+        "***EvictGlobal: getMemAllocationPlan: {}, storage dir number {}***", memAllocation,
+        storageDirs.length);
     Pair<StorageDir, List<BlockInfo>> dirCandidate = null;
     for (StorageDir dir : storageDirs) {
       dirCandidate = getDirCandidate(memAllocation, dir, pinList, requestBytes, fileId);
@@ -45,8 +48,24 @@ public class EvictGlobal implements EvictStrategy {
 
   private Pair<StorageDir, List<BlockInfo>> getDirCandidate(Map<Integer, Long> memAllocation,
       StorageDir curDir, Set<Integer> pinList, long requestBytes, int fileId) {
-    Map<Integer, Long> fileDistribution = mWorkerStorage.getFileDistributionClone();
     Set<Entry<Long, Long>> blocks = curDir.getBlockSizes();
+    Map<Integer, Long> fileDistribution = mWorkerStorage.getFileDistributionClone();
+    WorkerStorage.getLog().info("   ###EvictGlobal: my file distribution {}###   ",
+        fileDistribution);
+
+    // Map<Integer, Long> fileDistribution1 = new HashMap<>();
+    // for (Entry<Long, Long> entry : blocks) {
+    // int fid = tachyon.master.BlockInfo.computeInodeId(entry.getKey());
+    // Long size = fileDistribution1.get(fid);
+    // if (size == null) {
+    // size = 0L;
+    // }
+    // size += entry.getValue();
+    // fileDistribution1.put(fid, size);
+    // }
+    // WorkerStorage.getLog().info(" ###EvictGlobal: distribution from BlockSizes {}### ",
+    // fileDistribution1);
+
     long mem = curDir.getAvailableBytes();
     List<BlockInfo> toEvictBlocks = new ArrayList<BlockInfo>();
     Set<Long> blocksToEvict = new HashSet<Long>();
@@ -65,52 +84,22 @@ public class EvictGlobal implements EvictStrategy {
           "***EvictGlobal: candidate fileid {}, blockid {}, blocksize {}({}MB), dir {}***",
           tachyon.master.BlockInfo.computeInodeId(blockId), blockId, blockSize,
           blockSize / 1024 / 1024, curDir);
-      Long fileConsumption = fileDistribution.get(fileId);
+
+      int evictFid = tachyon.master.BlockInfo.computeInodeId(blockId);
+      Long fileConsumption = fileDistribution.get(evictFid);
       if (fileConsumption != null) {
         fileConsumption -= blockSize;
         if (fileConsumption > 0) {
-          fileDistribution.put(fileId, fileConsumption);
+          fileDistribution.put(evictFid, fileConsumption);
         } else {
-          fileDistribution.remove(fileId);
+          fileDistribution.remove(evictFid);
         }
       }
     }
     if (mem >= requestBytes) {
-      mWorkerStorage.setFileDistribution(fileDistribution);
       return new Pair<StorageDir, List<BlockInfo>>(curDir, toEvictBlocks);
     }
     return null;
-    // for (Entry<Long, Long> entry : blocks) {
-    // long blockId = entry.getKey();
-    // int thisFileId = tachyon.master.BlockInfo.computeInodeId(blockId);
-    // if (thisFileId == fileId || !blockEvictable(blockId, pinList)) {
-    // continue;
-    // }
-    // long blockSize = entry.getValue();
-    // Long fileConsumption = fileDistribution.get(fileId);
-    // if (fileConsumption == null || fileConsumption
-    // + mWorkerStorage.getFileTempMaxBytes(fileId) > memAllocation.get(fileId)) {
-    // mem += curDir.getBlockSize(blockId);
-    // toEvictBlocks.add(new BlockInfo(curDir, blockId, blockSize));
-    // WorkerStorage.getLog().info(
-    // "***EvictGlobal: candidate fileid {}, blockid {}, blocksize {}({}MB), dir {}***",
-    // fileId, blockId, blockSize, blockSize / 1024 / 1024, curDir);
-    // if (fileConsumption != null) {
-    // fileConsumption -= blockSize;
-    // if (fileConsumption > 0) {
-    // fileDistribution.put(fileId, fileConsumption);
-    // } else {
-    // fileDistribution.remove(fileId);
-    // }
-    // }
-    // }
-    //
-    // if (mem >= requestBytes) {
-    // mWorkerStorage.setFileDistribution(fileDistribution);
-    // return new Pair<StorageDir, List<BlockInfo>>(curDir, toEvictBlocks);
-    // }
-    // }
-    // return null;
   }
 
   private Entry<Long, Long> getBlockCandidate(Map<Integer, Long> memAllocation,

@@ -218,4 +218,12 @@ public class BlockInfo {
     sb.append(", mLocations: ").append(mLocations).append(")");
     return sb.toString();
   }
+
+  public synchronized int getInMemoryCopies() {
+    return mLocations.size();
+  }
+
+  public synchronized long getBlockSizeBytes() {
+    return mLength;
+  }
 }

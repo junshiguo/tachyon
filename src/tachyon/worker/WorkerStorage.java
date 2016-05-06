@@ -1054,7 +1054,7 @@ public class WorkerStorage {
         } else {
           mFileDistribution.remove(fileId);
         }
-      } else if (diff >= 0) {
+      } else {
         mFileDistribution.put(fileId, diff);
       }
     }
@@ -1083,6 +1083,10 @@ public class WorkerStorage {
     }
     mMemAllocationPlan = new HashMap<>();
     return mMemAllocationPlan;
+  }
+
+  public Map<Integer, Integer> getFileAccessTimes() throws IOException {
+    return mMasterClient.worker_getFileAccessTimes();
   }
 
   // public int getFileTempBlockCount(int fileId) {

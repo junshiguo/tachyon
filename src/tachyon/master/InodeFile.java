@@ -498,4 +498,17 @@ public class InodeFile extends Inode {
 
     writeElement(objWriter, dos, ele);
   }
+
+  /**
+   * total memory consumption over all workers
+   * 
+   * @return
+   */
+  public synchronized long getMemoryConsumptionBytes() {
+    long ret = 0;
+    for (BlockInfo blockInfo : mBlocks) {
+      ret += (blockInfo.getBlockSizeBytes() * blockInfo.getInMemoryCopies());
+    }
+    return ret;
+  }
 }

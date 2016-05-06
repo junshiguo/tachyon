@@ -2,10 +2,12 @@ package test;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import tachyon.TachyonURI;
 import tachyon.client.TachyonFS;
 import tachyon.thrift.ClientFileInfo;
+import tachyon.thrift.UserBlockAccessInfo;
 
 public class ListFileStatus {
 
@@ -24,6 +26,11 @@ public class ListFileStatus {
     List<ClientFileInfo> files = tfs.listStatus(new TachyonURI(args[0]));
     for (ClientFileInfo fileInfo : files) {
       System.out.println(fileInfo.name + " " + fileInfo.inMemoryPercentage);
+    }
+    System.out.println("##########");
+    Set<UserBlockAccessInfo> infos = tfs.getBlockAccessInfoFromMaster();
+    for (UserBlockAccessInfo info : infos) {
+      System.out.println(info.toString());
     }
   }
 

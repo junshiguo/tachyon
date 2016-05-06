@@ -67,6 +67,7 @@ import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TableColumnException;
 import tachyon.thrift.TableDoesNotExistException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.UserBlockAccessInfo;
 import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 import tachyon.util.NetworkUtils;
@@ -860,6 +861,21 @@ public final class MasterClient implements Closeable {
     return null;
   }
 
+  public synchronized Map<Integer, Integer> worker_getFileAccessTimes() throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        return mClient.worker_getFileAccessTimes();
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+    return null;
+  }
+
+
   public synchronized List<Integer> user_getAccessCount() throws IOException {
     while (!mIsShutdown) {
       connect();
@@ -967,6 +983,78 @@ public final class MasterClient implements Closeable {
         mConnected = false;
       }
     }
+  }
+
+  public synchronized void user_addBlockReadSourceSet(Set<Long> blocks, int source)
+      throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_addBlockReadSourceSet(blocks, source);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized long user_getMemoryConsumptionBytes(String path) throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        return mClient.user_getMemoryConsumptionBytes(path);
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+    return -1;
+  }
+
+  public synchronized void user_addBlockAccessInfo(Set<UserBlockAccessInfo> accessedBlocks)
+      throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_addBlockAccessInfo(accessedBlocks);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized void user_cleanBlockAccessInfo() throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_cleanBlockAccessInfo();
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
+  public synchronized Set<UserBlockAccessInfo> user_getBlockAccessInfo() throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        return mClient.user_getBlockAccessInfo();
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+    return null;
   }
 
 }

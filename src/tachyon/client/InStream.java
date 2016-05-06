@@ -27,6 +27,8 @@ public abstract class InStream extends InputStream {
   protected final TachyonFile mFile;
   protected final TachyonFS mTachyonFS;
   protected final ReadType mReadType;
+  protected int mReadSource = -1;
+  protected long mBlockIdForAnalysis = -1;
 
   /**
    * @param file the input file of the InStream
@@ -36,6 +38,14 @@ public abstract class InStream extends InputStream {
     mFile = file;
     mTachyonFS = mFile.mTachyonFS;
     mReadType = readType;
+  }
+
+  public int getReadSource() {
+    return mReadSource;
+  }
+
+  public long getBlockIdForAnalysis() {
+    return mBlockIdForAnalysis;
   }
 
   @Override

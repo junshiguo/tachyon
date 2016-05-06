@@ -38,10 +38,17 @@ public class LocalBlockInStream extends BlockInStream {
 
     mTachyonBuffer = buf;
     mBuffer = mTachyonBuffer.mData;
+    mTachyonFS.addBlockAccessInfo(file.mFileId,
+        tachyon.master.BlockInfo.computeBlockId(file.mFileId, blockIndex), mBuffer.limit());
+    mReadSource = BlockAccessInfo.READ_MEMORY;
+    mBlockIdForAnalysis = tachyon.master.BlockInfo.computeBlockId(file.mFileId, blockIndex);
   }
 
   @Override
   public void close() throws IOException {
+    long blockId = tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, mBlockIndex);
+    mTachyonFS.closeBlockAccessInfo(blockId, BlockAccessInfo.READ_MEMORY);
+    mTachyonFS.addBlockReadSource(blockId, BlockAccessInfo.READ_MEMORY);
     if (!mClosed) {
       mTachyonBuffer.close();
     }
@@ -105,4 +112,5 @@ public class LocalBlockInStream extends BlockInStream {
     mBuffer.position(mBuffer.position() + ret);
     return ret;
   }
+
 }
