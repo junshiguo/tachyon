@@ -39,6 +39,8 @@ public class EvictStrategies {
         return new EvictPartialLRU(isLastTier);
       case GLOBAL:
         return new EvictGlobal(isLastTier, workerStorage);
+      case LFU:
+        return new EvictLFU(isLastTier);
       default:
         return new EvictLRU(isLastTier);
     }

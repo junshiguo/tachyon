@@ -31,6 +31,7 @@ import com.google.common.io.Closer;
 
 import tachyon.Constants;
 import tachyon.util.CommonUtils;
+import tachyon.util.NetworkUtils;
 
 /**
  * BlockHandler for files on LocalFS, such as RamDisk, SSD and HDD.
@@ -109,6 +110,8 @@ public final class BlockHandlerLocal extends BlockHandler {
       length = (int) (fileLength - offset);
     }
     ByteBuffer buf = mLocalFileChannel.map(FileChannel.MapMode.READ_ONLY, offset, length);
+    // buf = NetworkUtils.clone(buf);
+    // System.gc();
     return buf;
   }
 }

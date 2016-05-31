@@ -109,6 +109,8 @@ public class RemoteBlockInStream extends BlockInStream {
    */
   private static final int MAX_REMOTE_READ_ATTEMPTS = 2;
 
+  private BlockAccessInfo mAccessInfo;
+
   /**
    * @param file the file the block belongs to
    * @param readType the InStream's read type
@@ -144,8 +146,10 @@ public class RemoteBlockInStream extends BlockInStream {
 
     mTryCreateBlock = true;
 
-    mTachyonFS.addBlockAccessInfo(file.mFileId, mBlockInfo.blockId, mBlockInfo.length,
-        BlockAccessInfo.READ_REMOTE);
+    // mTachyonFS.addBlockAccessInfo(file.mFileId, mBlockInfo.blockId, mBlockInfo.length,
+    // BlockAccessInfo.READ_REMOTE);
+    mAccessInfo = new BlockAccessInfo(file.mFileId, mBlockInfo.blockId, mBlockInfo.length,
+        System.currentTimeMillis(), BlockAccessInfo.READ_REMOTE);
     mReadSource = BlockAccessInfo.READ_REMOTE;
   }
 
@@ -167,8 +171,10 @@ public class RemoteBlockInStream extends BlockInStream {
 
   @Override
   public void close() throws IOException {
-    mTachyonFS.addBlockReadSource(mBlockInfo.blockId, mReadSource);
-    mTachyonFS.closeBlockAccessInfo(mBlockInfo.blockId);
+    // mTachyonFS.addBlockReadSource(mBlockInfo.blockId, mReadSource);
+    // mTachyonFS.closeBlockAccessInfo(mBlockInfo.blockId);
+    mAccessInfo.setClose();
+    mTachyonFS.addBlockAccessInfo(mAccessInfo);
     if (mClosed) {
       return;
     }
@@ -246,7 +252,11 @@ public class RemoteBlockInStream extends BlockInStream {
       int bytesToRead = (int) Math.min(bytesLeft, mCurrentBuffer.remaining());
       mCurrentBuffer.get(b, off, bytesToRead);
       if (mRecache || (mTrycache && mBlockOutStream != null)) {
-        mBlockOutStream.write(b, off, bytesToRead);
+        try {
+          mBlockOutStream.write(b, off, bytesToRead);
+        } catch (IOException e) {
+          cancelRecache();
+        }
       }
       off += bytesToRead;
       bytesLeft -= bytesToRead;
@@ -416,7 +426,8 @@ public class RemoteBlockInStream extends BlockInStream {
       mCheckpointPos += skipped;
     }
 
-    mTachyonFS.setBlockAccessInfoSource(mBlockInfo.blockId, BlockAccessInfo.READ_UFS);
+    // mTachyonFS.setBlockAccessInfoSource(mBlockInfo.blockId, BlockAccessInfo.READ_UFS);
+    mAccessInfo.setReadSource(BlockAccessInfo.READ_UFS);
     mReadSource = BlockAccessInfo.READ_UFS;
     return true;
   }

@@ -135,7 +135,10 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
         return ret;
       } catch (IOException e) {
         LOG.error(e.getMessage(), e);
-        mTachyonFileInputStream = null;
+        if (mTachyonFileInputStream != null) {
+          mTachyonFileInputStream.close();
+          mTachyonFileInputStream = null;
+        }
       }
     }
 
@@ -158,7 +161,10 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
         return ret;
       } catch (IOException e) {
         LOG.error(e.getMessage(), e);
-        mTachyonFileInputStream = null;
+        if (mTachyonFileInputStream != null) {
+          mTachyonFileInputStream.close();
+          mTachyonFileInputStream = null;
+        }
       }
     }
 
@@ -260,7 +266,10 @@ public class HdfsFileInputStream extends InputStream implements Seekable, Positi
         mTachyonFileInputStream.seek(pos);
         setBlockId();
       } catch (IOException e) {
-        mTachyonFileInputStream = null;
+        if (mTachyonFileInputStream != null) {
+          mTachyonFileInputStream.close();
+          mTachyonFileInputStream = null;
+        }
         getHdfsInputStream(pos);
         LOG.error(
             "#####HdfsFileInputStream.seek failed." + " Possibly cannot connect to worker#####");

@@ -29,6 +29,7 @@ import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
 
 import tachyon.conf.WorkerConf;
+import tachyon.util.NetworkUtils;
 import tachyon.worker.BlockHandler;
 import tachyon.worker.nio.DataServerMessage;
 
@@ -62,6 +63,9 @@ public final class BlockResponse {
         switch (WorkerConf.get().NETTY_FILE_TRANSFER_TYPE) {
           case MAPPED:
             ByteBuffer data = handler.read(msg.getOffset(), (int) msg.getLength());
+            data = NetworkUtils.clone(data);// new added, copy the mapped bytebyffer to avoid
+            // memory
+            // consumption
             out.add(Unpooled.wrappedBuffer(data));
             handler.close();
             break;

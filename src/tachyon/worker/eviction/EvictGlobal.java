@@ -66,7 +66,7 @@ public class EvictGlobal implements EvictStrategy {
     // WorkerStorage.getLog().info(" ###EvictGlobal: distribution from BlockSizes {}### ",
     // fileDistribution1);
 
-    long mem = curDir.getAvailableBytes();
+    long mem = 0;
     List<BlockInfo> toEvictBlocks = new ArrayList<BlockInfo>();
     Set<Long> blocksToEvict = new HashSet<Long>();
 

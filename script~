@@ -1,4 +1,4 @@
-mvn install:install-file -Dfile=/home/jsguo/tachyon/client/target/tachyon-client-0.6.4-jar-with-dependencies.jar -DgroupId=org.tachyonproject -DartifactId=tachyon-client -Dversion=0.6.4 -Dpackaging=jar
+mvn install:install-file -Dfile=./tachyon-client-0.6.4-jar-with-dependencies.jar -DgroupId=org.tachyonproject -DartifactId=tachyon-client -Dversion=0.6.4 -Dpackaging=jar
 
 ./build/mvn -DskipTests clean package
 

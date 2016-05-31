@@ -30,5 +30,7 @@ public enum EvictStrategyType {
   /**
    * Evict based on global info. Calling master function to decide.
    */
-  GLOBAL;
+  GLOBAL,
+
+  LFU;
 }

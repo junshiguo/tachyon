@@ -2699,6 +2699,12 @@ public class MasterInfo extends ImageWriter {
     }
   }
 
+  public void user_addBlockAccessInfo(UserBlockAccessInfo info) {
+    synchronized (mBlockAccessInfos) {
+      mBlockAccessInfos.add(info);
+    }
+  }
+
   public void user_cleanBlockAccessInfo() {
     synchronized (mBlockAccessInfos) {
       mBlockAccessInfos.clear();

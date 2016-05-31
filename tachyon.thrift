@@ -312,6 +312,8 @@ service MasterService {
   i64 user_getMemoryConsumptionBytes(1: string path)
 
   void user_addBlockAccessInfo(1: set<UserBlockAccessInfo> accessedBlocks)
+
+  void user_addBlockAccessInfoOne(1: UserBlockAccessInfo accessedBlock)
 	
   void user_cleanBlockAccessInfo()
 

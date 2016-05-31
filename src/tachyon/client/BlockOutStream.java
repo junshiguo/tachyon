@@ -127,7 +127,7 @@ public class BlockOutStream extends OutStream {
   }
 
   @Override
-  public void cancel() throws IOException {
+  public void cancel() throws IOException  {
     if (!mClosed) {
       mCloser.close();
       mClosed = true;

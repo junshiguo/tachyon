@@ -20,15 +20,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,10 +43,10 @@ import tachyon.TachyonURI;
 import tachyon.UnderFileSystem;
 import tachyon.Users;
 import tachyon.util.CommonUtils;
+import tachyon.util.NetworkUtils;
 import tachyon.worker.BlockHandler;
 import tachyon.worker.SpaceCounter;
 import tachyon.worker.WorkerStorage;
-import tachyon.worker.eviction.LFUUnit;
 
 /**
  * Stores and manages block files in storage's directory in different storage systems.
@@ -97,7 +92,7 @@ public final class StorageDir {
    * Newly added!!! It's not good to expose workerStorage in StorageDir
    */
   private final WorkerStorage mWorkerStorage;
-  /** For LFU */
+  /** For LFU. Map from block id to its access count */
   private final ConcurrentMap<Long, Integer> mBlockAccessCount =
       new ConcurrentHashMap<Long, Integer>();
 
@@ -140,7 +135,7 @@ public final class StorageDir {
     synchronized (mLastBlockAccessTimeMs) {
       if (containsBlock(blockId)) {
         mLastBlockAccessTimeMs.put(blockId, System.currentTimeMillis());
-
+        addBlockCount(blockId);
         LOG.info("***StorageDir.accessBlock: access block {}***", blockId);
       }
     }
@@ -168,6 +163,7 @@ public final class StorageDir {
   private void addBlockId(long blockId, long sizeBytes, long accessTimeMs, boolean report) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.put(blockId, accessTimeMs);
+      addBlockCount(blockId);
       int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
       if (mBlockSizes.containsKey(blockId)) {
         mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
@@ -329,6 +325,7 @@ public final class StorageDir {
    */
   public boolean deleteBlock(long blockId) throws IOException {
     Long accessTimeMs = mLastBlockAccessTimeMs.remove(blockId);
+    deleteBlockCount(blockId);
     if (accessTimeMs == null) {
       LOG.warn("Block does not exist in current StorageDir! blockId:{}", blockId);
       return false;
@@ -356,6 +353,7 @@ public final class StorageDir {
   private void deleteBlockId(long blockId) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.remove(blockId);
+      deleteBlockCount(blockId);
       mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
           -getBlockSize(blockId)); // newly added ugly code
       mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
@@ -398,12 +396,15 @@ public final class StorageDir {
   public ByteBuffer getBlockData(long blockId, long offset, int length) throws IOException {
     BlockHandler bh = getBlockHandler(blockId);
     try {
-      return bh.read(offset, length);
+      ByteBuffer buffer = bh.read(offset, length);
+      // return NetworkUtils.clone(buffer);
+      return buffer;
     } finally {
       bh.close();
       accessBlock(blockId);
     }
   }
+
 
   /**
    * Get file path of the block file
@@ -799,6 +800,27 @@ public final class StorageDir {
    */
   public Set<Long> getLockedBlocks() {
     return mUserPerLockedBlock.keySet();
+  }
+
+  private void addBlockCount(long blockId) {
+    synchronized (mBlockAccessCount) {
+      Integer count = mBlockAccessCount.get(blockId);
+      if (count == null) {
+        count = 0;
+      }
+      count ++;
+      mBlockAccessCount.put(blockId, count);
+    }
+  }
+
+  private void deleteBlockCount(long blockId) {
+    // synchronized (mBlockAccessCount) {
+    // mBlockAccessCount.remove(blockId);
+    // }
+  }
+
+  public Set<Entry<Long, Integer>> getBlockAccessCount() {
+    return mBlockAccessCount.entrySet();
   }
 
 }

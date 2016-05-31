@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 public class LocalBlockInStream extends BlockInStream {
   private TachyonByteBuffer mTachyonBuffer = null;
   private ByteBuffer mBuffer = null;
+  private BlockAccessInfo mAccessInfo;
 
   /**
    * @param file the file the block belongs to
@@ -38,17 +39,22 @@ public class LocalBlockInStream extends BlockInStream {
 
     mTachyonBuffer = buf;
     mBuffer = mTachyonBuffer.mData;
-    mTachyonFS.addBlockAccessInfo(file.mFileId,
+    // mTachyonFS.addBlockAccessInfo(file.mFileId,
+    // tachyon.master.BlockInfo.computeBlockId(file.mFileId, blockIndex), mBuffer.limit(),
+    // BlockAccessInfo.READ_MEMORY);
+    mAccessInfo = new BlockAccessInfo(file.mFileId,
         tachyon.master.BlockInfo.computeBlockId(file.mFileId, blockIndex), mBuffer.limit(),
-        BlockAccessInfo.READ_MEMORY);
+        System.currentTimeMillis(), BlockAccessInfo.READ_MEMORY);
     mReadSource = BlockAccessInfo.READ_MEMORY;
   }
 
   @Override
   public void close() throws IOException {
-    long blockId = tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, mBlockIndex);
-    mTachyonFS.addBlockReadSource(blockId, BlockAccessInfo.READ_MEMORY);
-    mTachyonFS.closeBlockAccessInfo(blockId);
+    // long blockId = tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, mBlockIndex);
+    // mTachyonFS.addBlockReadSource(blockId, BlockAccessInfo.READ_MEMORY);
+    // mTachyonFS.closeBlockAccessInfo(blockId);
+    mAccessInfo.setClose();
+    mTachyonFS.addBlockAccessInfo(mAccessInfo);
     if (!mClosed) {
       mTachyonBuffer.close();
     }

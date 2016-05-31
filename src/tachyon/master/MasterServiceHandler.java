@@ -410,4 +410,9 @@ public class MasterServiceHandler implements MasterService.Iface {
   public void user_addBlockReadSourceSet(Set<Long> blocks, int source) throws TException {
     mMasterInfo.user_addBlockReadSourceSet(blocks, source);
   }
+
+  @Override
+  public void user_addBlockAccessInfoOne(UserBlockAccessInfo accessedBlock) throws TException {
+    mMasterInfo.user_addBlockAccessInfo(accessedBlock);
+  }
 }

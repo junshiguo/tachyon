@@ -80,27 +80,6 @@ public class GatherResults {
       writer.newLine();
     }
 
-    //
-    // ArrayList<UserBlockAccessInfo> list2 = new ArrayList<>(infos);
-    // java.util.Collections.sort(list2, new Comparator<UserBlockAccessInfo>() {
-    //
-    // @Override
-    // public int compare(UserBlockAccessInfo o1, UserBlockAccessInfo o2) {
-    // return (int) (o2.duration - o1.duration);
-    // }
-    // });
-    // Set<Long> blockIds2 = new HashSet<>();
-    // int count = 0;
-    // for (UserBlockAccessInfo info : list2) {
-    // writer.write(info.toString());
-    // writer.newLine();
-    // blockIds2.add(info.blockId);
-    // count ++;
-    // if (blockIds2.size() == 99) {
-    // break;
-    // }
-    // }
-    // writer.write("###" + count + "###\n");
     writer.write("###END###\n");
     writer.close();
   }

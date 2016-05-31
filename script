@@ -8,3 +8,4 @@ ssh jsguo@ec2-54-200-88-106.us-west-2.compute.amazonaws.com
 
 mvn -pl:spark-core_2.10 clean install
 
+lsof | grep /mnt/ramdisk/tachyonworker/ | wc -l

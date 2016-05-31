@@ -1029,6 +1029,21 @@ public final class MasterClient implements Closeable {
     }
   }
 
+  public synchronized void user_addBlockAccessInfo(UserBlockAccessInfo accessedBlock)
+      throws IOException {
+    while (!mIsShutdown) {
+      connect();
+
+      try {
+        mClient.user_addBlockAccessInfoOne(accessedBlock);
+        return;
+      } catch (TException e) {
+        LOG.error(e.getMessage(), e);
+        mConnected = false;
+      }
+    }
+  }
+
   public synchronized void user_cleanBlockAccessInfo() throws IOException {
     while (!mIsShutdown) {
       connect();

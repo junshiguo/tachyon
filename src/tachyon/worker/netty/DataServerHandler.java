@@ -76,10 +76,10 @@ public final class DataServerHandler extends ChannelInboundHandlerAdapter {
       BlockResponse resp = BlockResponse.createErrorResponse(blockId);
       ChannelFuture future = ctx.writeAndFlush(resp);
       future.addListener(ChannelFutureListener.CLOSE);
+    } finally {
       if (handler != null) {
         handler.close();
       }
-    } finally {
       mLocker.unlock(blockId, lockId);
     }
   }
