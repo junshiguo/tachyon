@@ -41,6 +41,8 @@ public class EvictStrategies {
         return new EvictGlobal(isLastTier, workerStorage);
       case LFU:
         return new EvictLFU(isLastTier);
+      case MAXMIN:
+        return new EvictMaxMin(isLastTier, workerStorage);
       default:
         return new EvictLRU(isLastTier);
     }

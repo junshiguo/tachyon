@@ -31,7 +31,7 @@ public class EvictLFU implements EvictStrategy {
   }
 
   @Override
-  public Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
+  public synchronized Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
       Set<Integer> pinList, long requestBytes, int fileId) {
     List<BlockInfo> blockInfoList = new ArrayList<BlockInfo>();
     Map<StorageDir, Pair<Long, Integer>> dir2LFUBlocks =
@@ -72,7 +72,7 @@ public class EvictLFU implements EvictStrategy {
     int leastCount = Integer.MAX_VALUE;
     for (StorageDir dir : storageDirs) {
       Pair<Long, Integer> lfuBlock;
-      if (dir2LFUBlocks.containsKey(dir)) {
+      if (!dir2LFUBlocks.containsKey(dir)) {
         lfuBlock = getLFUBlock(dir, dir2BlocksToEvict.get(dir), pinList);
         if (lfuBlock.getFirst() != -1) {
           dir2LFUBlocks.put(dir, lfuBlock);
@@ -95,16 +95,22 @@ public class EvictLFU implements EvictStrategy {
       Set<Integer> pinList) {
     long blockId = -1;
     int leastAccessCount = Integer.MAX_VALUE;
+    long lastAccessTime = -1;
     Set<Entry<Long, Integer>> blockAccessCount = dir.getBlockAccessCount();
 
     for (Entry<Long, Integer> entry : blockAccessCount) {
       if (toEvictBlockIds.contains(entry.getKey()) || !dir.containsBlock(entry.getKey())) {
         continue;
       }
-      if (entry.getValue() < leastAccessCount && !dir.isBlockLocked(entry.getKey())) {
-        if (blockEvictable(blockId, pinList)) {
-          blockId = entry.getKey();
-          leastAccessCount = entry.getValue();
+      long curBlockId = entry.getKey();
+      int curCount = entry.getValue();
+      long time = dir.getLastBlockAccessTimeMs(curBlockId);
+      if (time != -1 && !dir.isBlockLocked(curBlockId) && (curCount < leastAccessCount
+          || curCount == leastAccessCount && time < lastAccessTime)) {
+        if (blockEvictable(curBlockId, pinList)) {
+          blockId = curBlockId;
+          leastAccessCount = curCount;
+          lastAccessTime = time;
         }
       }
     }

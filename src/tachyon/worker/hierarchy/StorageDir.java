@@ -20,8 +20,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -95,6 +97,11 @@ public final class StorageDir {
   /** For LFU. Map from block id to its access count */
   private final ConcurrentMap<Long, Integer> mBlockAccessCount =
       new ConcurrentHashMap<Long, Integer>();
+  /** For MaxMin. Map from file id to consumed bytes. Temp blocks not included. 
+   * For MAXMIN eviction usage. Seems would slow down worker performance.
+   * **/
+  private final HashMap<Integer, Long> mFileConsumption = new HashMap<>();
+  // private final HashMap<Integer, List<Long>> mFileAccessedBlocks = new HashMap<>();
 
   /**
    * Create a new StorageDir.
@@ -169,6 +176,12 @@ public final class StorageDir {
         mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
         mWorkerStorage.updateFileDistribution(fileId, -mBlockSizes.get(blockId));
       }
+      // Long cur = mFileConsumption.get(fileId);
+      // if (cur == null) {
+      // cur = 0L;
+      // }
+      // cur += sizeBytes;
+      // mFileConsumption.put(fileId, cur);
       mBlockSizes.put(blockId, sizeBytes);
       mWorkerStorage.updateFileDistribution(fileId, sizeBytes); // newly added ugly code
       if (report) {
@@ -354,8 +367,18 @@ public final class StorageDir {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.remove(blockId);
       deleteBlockCount(blockId);
-      mWorkerStorage.updateFileDistribution(tachyon.master.BlockInfo.computeInodeId(blockId),
-          -getBlockSize(blockId)); // newly added ugly code
+      long sizeBytes = getBlockSize(blockId);
+      int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
+      mWorkerStorage.updateFileDistribution(fileId, -sizeBytes);
+      // Long cur = mFileConsumption.get(fileId);
+      // if (cur != null) {
+      // cur -= sizeBytes;
+      // if (cur > 0) {
+      // mFileConsumption.put(fileId, cur);
+      // } else {
+      // mFileConsumption.remove(fileId);
+      // }
+      // }
       mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
       if (mAddedBlockIdList.contains(blockId)) {
         mAddedBlockIdList.remove(blockId);
@@ -501,20 +524,31 @@ public final class StorageDir {
     return mLastBlockAccessTimeMs.entrySet();
   }
 
+  public long getLastBlockAccessTimeMs(long blockId) {
+    synchronized (mLastBlockAccessTimeMs) {
+      Long ret = mLastBlockAccessTimeMs.get(blockId);
+      return ret == null ? -1 : ret;
+    }
+  }
+
   /**
    * Get size of locked blocks in bytes in current StorageDir
    * 
    * @return size of locked blocks in bytes in current StorageDir
    */
-  public long getLockedSizeBytes() {
+  public synchronized long getLockedSizeBytes() {
     long lockedBytes = 0;
-    for (long blockId : mUserPerLockedBlock.keySet()) {
-      Long blockSize = mBlockSizes.get(blockId);
-      if (blockSize != null) {
-        lockedBytes += blockSize;
+    try {
+      for (long blockId : mUserPerLockedBlock.keySet()) {
+        Long blockSize = mBlockSizes.get(blockId);
+        if (blockSize != null) {
+          lockedBytes += blockSize;
+        }
       }
+      return lockedBytes;
+    } catch (Exception exception) {
+      return this.getCapacityBytes();
     }
-    return lockedBytes;
   }
 
   /**
@@ -821,6 +855,12 @@ public final class StorageDir {
 
   public Set<Entry<Long, Integer>> getBlockAccessCount() {
     return mBlockAccessCount.entrySet();
+  }
+
+  public Map<Integer, Long> getFileConsumptionClone() {
+    synchronized (mLastBlockAccessTimeMs) {
+      return new HashMap<>(mFileConsumption);
+    }
   }
 
 }

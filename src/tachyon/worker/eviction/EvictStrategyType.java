@@ -32,5 +32,7 @@ public enum EvictStrategyType {
    */
   GLOBAL,
 
-  LFU;
+  LFU,
+
+  MAXMIN;
 }

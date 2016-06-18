@@ -65,7 +65,11 @@ public class FileInStream extends InStream {
   private void checkAndAdvanceBlockInStream() throws IOException {
     if (mCurrentBlockLeft == 0) {
       if (mCurrentBlockInStream != null) {
-        mCurrentBlockInStream.close();
+        try {
+          mCurrentBlockInStream.close();
+        } catch (IOException e) {
+          mCurrentBlockInStream = null;
+        }
       }
 
       mCurrentBlockIndex = getCurrentBlockIndex();

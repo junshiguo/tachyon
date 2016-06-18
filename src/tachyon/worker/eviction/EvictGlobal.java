@@ -1,7 +1,6 @@
 package tachyon.worker.eviction;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +16,8 @@ public class EvictGlobal implements EvictStrategy {
   private final boolean mLastTier;
   private final WorkerStorage mWorkerStorage;
 
-  public EvictGlobal(boolean isLasterTier, WorkerStorage workerStorage) {
-    mLastTier = isLasterTier;
+  public EvictGlobal(boolean isLastTier, WorkerStorage workerStorage) {
+    mLastTier = isLastTier;
     mWorkerStorage = workerStorage;
   }
 

@@ -35,6 +35,7 @@ import com.google.common.base.Throwables;
 
 import tachyon.Constants;
 import tachyon.conf.CommonConf;
+import tachyon.util.NetworkUtils;
 import tachyon.worker.BlocksLocker;
 import tachyon.worker.DataServer;
 import tachyon.worker.hierarchy.StorageDir;
@@ -218,6 +219,7 @@ public class NIODataServer implements Runnable, DataServer {
       int dataLen = 0;
       try {
         data = storageDir.getBlockData(blockId, tMessage.getOffset(), (int) tMessage.getLength());
+        data = NetworkUtils.clone(data);
         storageDir.accessBlock(blockId);
         dataLen = data.limit();
       } catch (Exception e) {
