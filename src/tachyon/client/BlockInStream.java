@@ -76,4 +76,8 @@ public abstract class BlockInStream extends InStream {
     super(file, readType);
     mBlockIndex = blockIndex;
   }
+
+  public long getBlockId() {
+    return tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, mBlockIndex);
+  }
 }

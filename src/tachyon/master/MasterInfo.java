@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,7 +40,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.swing.plaf.synth.SynthRadioButtonMenuItemUI;
+
+import org.apache.commons.collections.bag.SynchronizedBag;
 import org.apache.thrift.TException;
+import org.apache.zookeeper.server.quorum.Election;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +52,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
+import com.sun.swing.internal.plaf.synth.resources.synth;
 
 import tachyon.Constants;
 import tachyon.HeartbeatExecutor;
@@ -56,6 +62,7 @@ import tachyon.PrefixList;
 import tachyon.TachyonURI;
 import tachyon.UnderFileSystem;
 import tachyon.UnderFileSystem.SpaceType;
+import tachyon.client.BlockAccessInfo;
 import tachyon.conf.CommonConf;
 import tachyon.conf.MasterConf;
 import tachyon.thrift.BlockInfoException;
@@ -75,6 +82,8 @@ import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TableColumnException;
 import tachyon.thrift.TableDoesNotExistException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.UserBlockAccessInfo;
+import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 import tachyon.worker.WorkerClientRemote;
 
@@ -82,6 +91,102 @@ import tachyon.worker.WorkerClientRemote;
  * A global view of filesystem in master.
  */
 public class MasterInfo extends ImageWriter {
+  private Boolean mDoBalance = false;
+
+
+  private boolean isDoBalance() {
+    synchronized (mDoBalance) {
+      return mDoBalance;
+    }
+  }
+
+  private void setDoBalance(boolean is) {
+    synchronized (mDoBalance) {
+      mDoBalance = is;
+    }
+  }
+
+  /**
+   * Newly added. Balance blocks of the same file among workers.
+   * 
+   * @author guojunshi
+   *
+   */
+  public class BalanceExecutor implements Runnable {
+    @Override
+    public void run() {
+      Thread.currentThread().setName("memory-balance-executor");
+      while (!Thread.currentThread().isInterrupted()) {
+        if (isDoBalance()) {
+          // TODO:
+        } else {
+          CommonUtils.sleepMs(LOG, Constants.SECOND_MS);
+        }
+      }
+    }
+
+    public boolean balanceFile(int fileId) {
+      try {
+        List<ClientBlockInfo> clientBlockInfos = getFileBlocks(fileId);
+      } catch (FileDoesNotExistException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
+      return false;
+    }
+
+    /**
+     * Update worker info in master side. When worker do heartbeat, the added block info will be
+     * returned and then worker will do cache from remote work.
+     * 
+     * No need to update MasterInfo metedata, cause when the worker finishes caching, it will inform
+     * master.
+     * 
+     * @param workerId
+     * @param blockId
+     * @return
+     */
+    public boolean cacheRemoteBlock(long workerId, long blockId) {
+      synchronized (mRootLock) {
+        synchronized (mWorkers) {
+          MasterWorkerInfo tWorkerInfo = mWorkers.get(workerId);
+          // tWorkerInfo.updateToCachedBlock(true, blockId);
+          // tWorkerInfo.updateLastUpdatedTimeMs();
+        }
+      }
+      return true;
+    }
+
+    public boolean cacheRemoteBlocks(long workerId, List<Long> blockIds) {
+      synchronized (mRootLock) {
+        synchronized (mWorkers) {
+          MasterWorkerInfo tWorkerInfo = mWorkers.get(workerId);
+          // tWorkerInfo.updateToCachedBlocks(true, blockIds);
+        }
+      }
+      return true;
+    }
+
+    /**
+     * Update worker info in master side. When worker do heartbeat, the freed blocks will be
+     * returned and then the worker will do free block command.
+     * 
+     * No need to update MasterInfo metedata, cause when the worker finishes free work, its heatbeat
+     * will inform master to update metedata.
+     * 
+     * @param workerId
+     * @param blockIds
+     */
+    public void freeBlocks(Long workerId, List<Long> blockIds) {
+      synchronized (mRootLock) {
+        synchronized (mWorkers) {
+          MasterWorkerInfo tWorkerInfo = mWorkers.get(workerId);
+          tWorkerInfo.updateToRemovedBlocks(true, blockIds);
+        }
+      }
+    }
+
+  }
 
   /**
    * Master info periodical status check.
@@ -156,8 +261,8 @@ public class MasterInfo extends ImageWriter {
       if (hadFailedWorker) {
         LOG.warn("Restarting failed workers.");
         try {
-          java.lang.Runtime.getRuntime().exec(
-              CommonConf.get().TACHYON_HOME + "/bin/tachyon-start.sh restart_workers");
+          java.lang.Runtime.getRuntime()
+              .exec(CommonConf.get().TACHYON_HOME + "/bin/tachyon-start.sh restart_workers");
         } catch (IOException e) {
           LOG.error(e.getMessage());
         }
@@ -259,6 +364,7 @@ public class MasterInfo extends ImageWriter {
   private final Map<Integer, Inode> mFileIdToInodes = new HashMap<Integer, Inode>();
   private final Map<Integer, Dependency> mFileIdToDependency = new HashMap<Integer, Dependency>();
   private final RawTables mRawTables = new RawTables();
+  private final EvictGlobalInfo mEvictGlobalInfo = new EvictGlobalInfo(this);
 
   // TODO add initialization part for master failover or restart. All operations on these members
   // are synchronized on mFileIdToDependency.
@@ -305,7 +411,7 @@ public class MasterInfo extends ImageWriter {
 
     mJournal.loadImage(this);
   }
-  
+
   /**
    * Inner function called only by master. Cache the block identified by blockId from the workerFrom
    * to workerTo.
@@ -320,8 +426,9 @@ public class MasterInfo extends ImageWriter {
   public boolean _cacheBlockRemote(NetAddress worker, long blockId) throws IOException, TException {
     MasterClient masterClient = new MasterClient(mMasterAddress, mExecutorService);
     WorkerClientRemote workerClient = new WorkerClientRemote(masterClient, worker, null);
-    boolean ret =
-        workerClient.master_cacheFromRemote(-1, masterClient.user_getClientBlockInfo(blockId));
+    List<ClientBlockInfo> blockInfos = new ArrayList<ClientBlockInfo>();
+    blockInfos.add(getClientBlockInfo(blockId));
+    boolean ret = workerClient.master_cacheFromRemote(-1, blockInfos);
     workerClient.close();
     masterClient.close();
     return ret;
@@ -341,8 +448,8 @@ public class MasterInfo extends ImageWriter {
    * @throws BlockInfoException
    */
   Pair<Boolean, Boolean> _addCheckpoint(long workerId, int fileId, long length,
-      TachyonURI checkpointPath, long opTimeMs) throws FileNotFoundException,
-      SuspectedFileSizeException, BlockInfoException {
+      TachyonURI checkpointPath, long opTimeMs)
+          throws FileNotFoundException, SuspectedFileSizeException, BlockInfoException {
     LOG.info(CommonUtils.parametersToString(workerId, fileId, length, checkpointPath));
 
     if (workerId != -1) {
@@ -365,8 +472,8 @@ public class MasterInfo extends ImageWriter {
 
       if (tFile.isComplete()) {
         if (tFile.getLength() != length) {
-          throw new SuspectedFileSizeException(fileId + ". Original Size: " + tFile.getLength()
-              + ". New Size: " + length);
+          throw new SuspectedFileSizeException(
+              fileId + ". Original Size: " + tFile.getLength() + ". New Size: " + length);
         }
       } else {
         tFile.setLength(length);
@@ -427,7 +534,7 @@ public class MasterInfo extends ImageWriter {
   int _createDependency(List<Integer> parentsIds, List<Integer> childrenIds, String commandPrefix,
       List<ByteBuffer> data, String comment, String framework, String frameworkVersion,
       DependencyType dependencyType, int dependencyId, long creationTimeMs)
-      throws InvalidPathException, FileDoesNotExistException {
+          throws InvalidPathException, FileDoesNotExistException {
     Dependency dep = null;
     synchronized (mRootLock) {
       Set<Integer> parentDependencyIds = new HashSet<Integer>();
@@ -435,8 +542,8 @@ public class MasterInfo extends ImageWriter {
         int parentId = parentsIds.get(k);
         Inode inode = mFileIdToInodes.get(parentId);
         if (inode.isFile()) {
-          LOG.info("PARENT DEPENDENCY ID IS " + ((InodeFile) inode).getDependencyId() + " "
-              + (inode));
+          LOG.info(
+              "PARENT DEPENDENCY ID IS " + ((InodeFile) inode).getDependencyId() + " " + (inode));
           if (((InodeFile) inode).getDependencyId() != -1) {
             parentDependencyIds.add(((InodeFile) inode).getDependencyId());
           }
@@ -445,9 +552,8 @@ public class MasterInfo extends ImageWriter {
         }
       }
 
-      dep =
-          new Dependency(dependencyId, parentsIds, childrenIds, commandPrefix, data, comment,
-              framework, frameworkVersion, dependencyType, parentDependencyIds, creationTimeMs);
+      dep = new Dependency(dependencyId, parentsIds, childrenIds, commandPrefix, data, comment,
+          framework, frameworkVersion, dependencyType, parentDependencyIds, creationTimeMs);
 
       List<Inode> childrenInodes = new ArrayList<Inode>();
       for (int k = 0; k < childrenIds.size(); k ++) {
@@ -498,7 +604,7 @@ public class MasterInfo extends ImageWriter {
    */
   int _createFile(boolean recursive, TachyonURI path, boolean directory, long blockSizeByte,
       long creationTimeMs) throws FileAlreadyExistException, InvalidPathException,
-      BlockInfoException, TachyonException {
+          BlockInfoException, TachyonException {
     if (path.isRoot()) {
       LOG.info("FileAlreadyExistException: " + path);
       throw new FileAlreadyExistException(path.toString());
@@ -543,9 +649,8 @@ public class MasterInfo extends ImageWriter {
       InodeFolder currentInodeFolder = (InodeFolder) inodeTraversal.getFirst();
       // Fill in the directories that were missing.
       for (int k = pathIndex; k < parentPath.length; k ++) {
-        Inode dir =
-            new InodeFolder(pathNames[k], mInodeCounter.incrementAndGet(),
-                currentInodeFolder.getId(), creationTimeMs);
+        Inode dir = new InodeFolder(pathNames[k], mInodeCounter.incrementAndGet(),
+            currentInodeFolder.getId(), creationTimeMs);
         dir.setPinned(currentInodeFolder.isPinned());
         currentInodeFolder.addChild(dir);
         currentInodeFolder.setLastModificationTimeMs(creationTimeMs);
@@ -565,14 +670,12 @@ public class MasterInfo extends ImageWriter {
         throw new FileAlreadyExistException(path.toString());
       }
       if (directory) {
-        ret =
-            new InodeFolder(name, mInodeCounter.incrementAndGet(), currentInodeFolder.getId(),
-                creationTimeMs);
+        ret = new InodeFolder(name, mInodeCounter.incrementAndGet(), currentInodeFolder.getId(),
+            creationTimeMs);
         ret.setPinned(currentInodeFolder.isPinned());
       } else {
-        ret =
-            new InodeFile(name, mInodeCounter.incrementAndGet(), currentInodeFolder.getId(),
-                blockSizeByte, creationTimeMs);
+        ret = new InodeFile(name, mInodeCounter.incrementAndGet(), currentInodeFolder.getId(),
+            blockSizeByte, creationTimeMs);
         ret.setPinned(currentInodeFolder.isPinned());
         if (ret.isPinned()) {
           mPinnedInodeFileIds.add(ret.getId());
@@ -795,8 +898,8 @@ public class MasterInfo extends ImageWriter {
           }
         }
         if (isPrefix) {
-          throw new InvalidPathException("Failed to rename: " + srcPath + " is a prefix of "
-              + dstPath);
+          throw new InvalidPathException(
+              "Failed to rename: " + srcPath + " is a prefix of " + dstPath);
         }
       }
 
@@ -908,6 +1011,14 @@ public class MasterInfo extends ImageWriter {
    */
   private void addToInodeMap(Inode inode, Map<Integer, Inode> map) {
     map.put(inode.getId(), inode);
+    if (inode.isFile()) {
+      InodeFile file = (InodeFile) inode;
+      List<BlockInfo> blocks = file.getBlockList();
+      for (BlockInfo blockInfo : blocks) {
+        // blockInfo.getBlockIdWorkerIdPairs()
+
+      }
+    }
     if (inode.isDirectory()) {
       InodeFolder inodeFolder = (InodeFolder) inode;
       for (Inode child : inodeFolder.getChildren()) {
@@ -931,8 +1042,8 @@ public class MasterInfo extends ImageWriter {
    */
   public int cacheBlock(long workerId, long workerUsedBytes, long storageDirId, long blockId,
       long length)
-      throws FileDoesNotExistException, SuspectedFileSizeException, BlockInfoException {
-    LOG.debug("Cache block: {}",
+          throws FileDoesNotExistException, SuspectedFileSizeException, BlockInfoException {
+    LOG.info("Cache block: {}",
         CommonUtils.parametersToString(workerId, workerUsedBytes, blockId, length));
 
     MasterWorkerInfo tWorkerInfo = getWorkerInfo(workerId);
@@ -985,7 +1096,7 @@ public class MasterInfo extends ImageWriter {
   public int createDependency(List<TachyonURI> parents, List<TachyonURI> children,
       String commandPrefix, List<ByteBuffer> data, String comment, String framework,
       String frameworkVersion, DependencyType dependencyType)
-      throws InvalidPathException, FileDoesNotExistException {
+          throws InvalidPathException, FileDoesNotExistException {
     synchronized (mRootLock) {
       LOG.info("ParentList: " + CommonUtils.listToString(parents));
       List<Integer> parentsIdList = getFilesIds(parents);
@@ -993,9 +1104,8 @@ public class MasterInfo extends ImageWriter {
 
       int depId = mDependencyCounter.incrementAndGet();
       long creationTimeMs = System.currentTimeMillis();
-      int ret =
-          _createDependency(parentsIdList, childrenIdList, commandPrefix, data, comment, framework,
-              frameworkVersion, dependencyType, depId, creationTimeMs);
+      int ret = _createDependency(parentsIdList, childrenIdList, commandPrefix, data, comment,
+          framework, frameworkVersion, dependencyType, depId, creationTimeMs);
 
       return ret;
     }
@@ -1020,8 +1130,8 @@ public class MasterInfo extends ImageWriter {
     }
   }
 
-  public int createFile(TachyonURI path, long blockSizeByte) throws FileAlreadyExistException,
-      InvalidPathException, BlockInfoException, TachyonException {
+  public int createFile(TachyonURI path, long blockSizeByte)
+      throws FileAlreadyExistException, InvalidPathException, BlockInfoException, TachyonException {
     return createFile(true, path, false, blockSizeByte);
   }
 
@@ -1070,8 +1180,8 @@ public class MasterInfo extends ImageWriter {
     LOG.info("createRawTable" + CommonUtils.parametersToString(path, columns));
 
     if (columns <= 0 || columns >= CommonConf.get().MAX_COLUMNS) {
-      throw new TableColumnException("Column " + columns + " should between 0 to "
-          + CommonConf.get().MAX_COLUMNS);
+      throw new TableColumnException(
+          "Column " + columns + " should between 0 to " + CommonConf.get().MAX_COLUMNS);
     }
 
     int id;
@@ -1153,8 +1263,8 @@ public class MasterInfo extends ImageWriter {
    * @throws InvalidPathException
    * @throws FileDoesNotExistException
    */
-  public List<BlockInfo> getBlockList(TachyonURI path) throws InvalidPathException,
-      FileDoesNotExistException {
+  public List<BlockInfo> getBlockList(TachyonURI path)
+      throws InvalidPathException, FileDoesNotExistException {
     Inode inode = getInode(path);
     if (inode == null) {
       throw new FileDoesNotExistException(path + " does not exist.");
@@ -1189,8 +1299,8 @@ public class MasterInfo extends ImageWriter {
    * @throws FileDoesNotExistException
    * @throws BlockInfoException
    */
-  public ClientBlockInfo getClientBlockInfo(long blockId) throws FileDoesNotExistException,
-      BlockInfoException {
+  public ClientBlockInfo getClientBlockInfo(long blockId)
+      throws FileDoesNotExistException, BlockInfoException {
     int fileId = BlockInfo.computeInodeId(blockId);
     synchronized (mRootLock) {
       Inode inode = mFileIdToInodes.get(fileId);
@@ -1200,6 +1310,30 @@ public class MasterInfo extends ImageWriter {
       ClientBlockInfo ret =
           ((InodeFile) inode).getClientBlockInfo(BlockInfo.computeBlockIndex(blockId));
       LOG.debug("getClientBlockInfo: {} : {}", blockId, ret);
+      return ret;
+    }
+  }
+
+  /**
+   * newly added.
+   * 
+   * @param blockId
+   * @param address
+   * @return
+   * @throws FileDoesNotExistException
+   * @throws BlockInfoException
+   */
+  public WorkerBlockInfo getWorkerBlockInfo(long blockId, NetAddress address)
+      throws FileDoesNotExistException, BlockInfoException {
+    int fileId = BlockInfo.computeInodeId(blockId);
+    synchronized (mRootLock) {
+      Inode inode = mFileIdToInodes.get(fileId);
+      if (inode == null || inode.isDirectory()) {
+        throw new FileDoesNotExistException("FileId " + fileId + " does not exist.");
+      }
+      WorkerBlockInfo ret =
+          ((InodeFile) inode).getWorkerBlockInfo(BlockInfo.computeBlockIndex(blockId), address);
+      LOG.debug("getWorkerBlockInfo: {}, {} : {}", blockId, address, ret);
       return ret;
     }
   }
@@ -1342,8 +1476,8 @@ public class MasterInfo extends ImageWriter {
    * @throws FileDoesNotExistException
    * @throws InvalidPathException
    */
-  public List<ClientBlockInfo> getFileBlocks(TachyonURI path) throws FileDoesNotExistException,
-      InvalidPathException {
+  public List<ClientBlockInfo> getFileBlocks(TachyonURI path)
+      throws FileDoesNotExistException, InvalidPathException {
     LOG.info("getFileLocations: " + path);
     synchronized (mRootLock) {
       Inode inode = getInode(path);
@@ -1363,8 +1497,8 @@ public class MasterInfo extends ImageWriter {
    * @throws InvalidPathException
    * @throws FileDoesNotExistException
    */
-  private List<Integer> getFilesIds(List<TachyonURI> pathList) throws InvalidPathException,
-      FileDoesNotExistException {
+  private List<Integer> getFilesIds(List<TachyonURI> pathList)
+      throws InvalidPathException, FileDoesNotExistException {
     List<Integer> ret = new ArrayList<Integer>(pathList.size());
     for (int k = 0; k < pathList.size(); k ++) {
       ret.addAll(listFiles(pathList.get(k), true));
@@ -1381,8 +1515,8 @@ public class MasterInfo extends ImageWriter {
    * @throws FileDoesNotExistException
    * @throws InvalidPathException
    */
-  public List<ClientFileInfo> getFilesInfo(TachyonURI path) throws FileDoesNotExistException,
-      InvalidPathException {
+  public List<ClientFileInfo> getFilesInfo(TachyonURI path)
+      throws FileDoesNotExistException, InvalidPathException {
     List<ClientFileInfo> ret = new ArrayList<ClientFileInfo>();
 
     Inode inode = getInode(path);
@@ -1412,8 +1546,8 @@ public class MasterInfo extends ImageWriter {
         new LinkedList<Pair<InodeFolder, TachyonURI>>();
     synchronized (mRootLock) {
       // TODO: Verify we want to use absolute path.
-      nodesQueue.add(
-          new Pair<InodeFolder, TachyonURI>(mRoot, new TachyonURI(TachyonURI.SEPARATOR)));
+      nodesQueue
+          .add(new Pair<InodeFolder, TachyonURI>(mRoot, new TachyonURI(TachyonURI.SEPARATOR)));
       while (!nodesQueue.isEmpty()) {
         Pair<InodeFolder, TachyonURI> tPair = nodesQueue.poll();
         InodeFolder tFolder = tPair.getFirst();
@@ -1753,7 +1887,7 @@ public class MasterInfo extends ImageWriter {
    * @param workerId The id of the worker to look at
    * @return the info about the worker
    */
-  private MasterWorkerInfo getWorkerInfo(long workerId) {
+  public MasterWorkerInfo getWorkerInfo(long workerId) {
     MasterWorkerInfo ret = null;
     synchronized (mWorkers) {
       ret = mWorkers.get(workerId);
@@ -1803,9 +1937,8 @@ public class MasterInfo extends ImageWriter {
     mJournal.createImage(this);
     mJournal.createEditLog(mCheckpointInfo.getEditTransactionCounter());
 
-    mHeartbeat =
-        mExecutorService.submit(new HeartbeatThread("Master Heartbeat",
-            new MasterInfoHeartbeatExecutor(), mMasterConf.HEARTBEAT_INTERVAL_MS));
+    mHeartbeat = mExecutorService.submit(new HeartbeatThread("Master Heartbeat",
+        new MasterInfoHeartbeatExecutor(), mMasterConf.HEARTBEAT_INTERVAL_MS));
 
     mRecompute = mExecutorService.submit(new RecomputationScheduler());
   }
@@ -1819,8 +1952,8 @@ public class MasterInfo extends ImageWriter {
    * @throws InvalidPathException
    * @throws FileDoesNotExistException
    */
-  public List<Integer> listFiles(TachyonURI path, boolean recursive) throws InvalidPathException,
-      FileDoesNotExistException {
+  public List<Integer> listFiles(TachyonURI path, boolean recursive)
+      throws InvalidPathException, FileDoesNotExistException {
     List<Integer> ret = new ArrayList<Integer>();
     synchronized (mRootLock) {
       Inode inode = getInode(path);
@@ -1936,8 +2069,8 @@ public class MasterInfo extends ImageWriter {
    * @throws InvalidPathException
    * @throws FileDoesNotExistException
    */
-  public List<TachyonURI> ls(TachyonURI path, boolean recursive) throws InvalidPathException,
-      FileDoesNotExistException {
+  public List<TachyonURI> ls(TachyonURI path, boolean recursive)
+      throws InvalidPathException, FileDoesNotExistException {
     synchronized (mRootLock) {
       Inode inode = getInode(path);
       if (inode == null) {
@@ -1956,8 +2089,8 @@ public class MasterInfo extends ImageWriter {
    * @throws InvalidPathException
    * @throws TachyonException
    */
-  public boolean mkdirs(TachyonURI path, boolean recursive) throws FileAlreadyExistException,
-      InvalidPathException, TachyonException {
+  public boolean mkdirs(TachyonURI path, boolean recursive)
+      throws FileAlreadyExistException, InvalidPathException, TachyonException {
     try {
       return createFile(recursive, path, true, 0) > 0;
     } catch (BlockInfoException e) {
@@ -2074,8 +2207,8 @@ public class MasterInfo extends ImageWriter {
    * @throws FileDoesNotExistException
    * @throws InvalidPathException
    */
-  public boolean rename(int fileId, TachyonURI dstPath) throws FileDoesNotExistException,
-      InvalidPathException {
+  public boolean rename(int fileId, TachyonURI dstPath)
+      throws FileDoesNotExistException, InvalidPathException {
     long opTimeMs = System.currentTimeMillis();
     synchronized (mRootLock) {
       boolean ret = _rename(fileId, dstPath, opTimeMs);
@@ -2094,8 +2227,8 @@ public class MasterInfo extends ImageWriter {
    * @throws FileDoesNotExistException
    * @throws InvalidPathException
    */
-  public boolean rename(TachyonURI srcPath, TachyonURI dstPath) throws FileDoesNotExistException,
-      InvalidPathException {
+  public boolean rename(TachyonURI srcPath, TachyonURI dstPath)
+      throws FileDoesNotExistException, InvalidPathException {
     synchronized (mRootLock) {
       Inode inode = getInode(srcPath);
       if (inode == null) {
@@ -2165,14 +2298,14 @@ public class MasterInfo extends ImageWriter {
     }
   }
 
- /**
-  * Free the file/folder based on the files' ID
-  *
-  * @param fileId the file/folder to be freed.
-  * @param recursive whether free the folder recursively or not
-  * @return succeed or not
-  * @throws TachyonException
-  */
+  /**
+   * Free the file/folder based on the files' ID
+   *
+   * @param fileId the file/folder to be freed.
+   * @param recursive whether free the folder recursively or not
+   * @return succeed or not
+   * @throws TachyonException
+   */
   boolean freepath(int fileId, boolean recursive) throws TachyonException {
     LOG.info("free(" + fileId + ")");
     synchronized (mRootLock) {
@@ -2204,8 +2337,8 @@ public class MasterInfo extends ImageWriter {
         Inode freeInode = freeInodes.get(i);
 
         if (freeInode.isFile()) {
-          List<Pair<Long, Long>> blockIdWorkerIdList
-              = ((InodeFile) freeInode).getBlockIdWorkerIdPairs();
+          List<Pair<Long, Long>> blockIdWorkerIdList =
+              ((InodeFile) freeInode).getBlockIdWorkerIdPairs();
           synchronized (mWorkers) {
             for (Pair<Long, Long> blockIdWorkerId : blockIdWorkerIdList) {
               MasterWorkerInfo workerInfo = mWorkers.get(blockIdWorkerId.getSecond());
@@ -2220,14 +2353,14 @@ public class MasterInfo extends ImageWriter {
     return true;
   }
 
- /**
-  * Frees files based on the path
-  *
-  * @param path The file to be freed.
-  * @param recursive whether delete the file recursively or not.
-  * @return succeed or not
-  * @throws TachyonException
-  */
+  /**
+   * Frees files based on the path
+   *
+   * @param path The file to be freed.
+   * @param recursive whether delete the file recursively or not.
+   * @return succeed or not
+   * @throws TachyonException
+   */
   public boolean freepath(TachyonURI path, boolean recursive) throws TachyonException {
     LOG.info("free(" + path + ")");
     synchronized (mRootLock) {
@@ -2354,8 +2487,7 @@ public class MasterInfo extends ImageWriter {
    * @throws BlockInfoException
    */
   public Command workerHeartbeat(long workerId, long usedBytes, List<Long> removedBlockIds,
-      Map<Long, List<Long>> addedBlockIds)
-      throws BlockInfoException {
+      Map<Long, List<Long>> addedBlockIds) throws BlockInfoException {
     LOG.debug("WorkerId: {}", workerId);
     synchronized (mRootLock) {
       synchronized (mWorkers) {
@@ -2364,7 +2496,8 @@ public class MasterInfo extends ImageWriter {
         if (tWorkerInfo == null) {
           LOG.info("worker_heartbeat(): Does not contain worker with ID " + workerId
               + " . Send command to let it re-register.");
-          return new Command(CommandType.Register, new ArrayList<Long>());
+          return new Command(CommandType.Register, new ArrayList<Long>(),
+              new ArrayList<ClientBlockInfo>());
         }
 
         tWorkerInfo.updateUsedBytes(usedBytes);
@@ -2408,12 +2541,13 @@ public class MasterInfo extends ImageWriter {
 
         List<Long> toRemovedBlocks = tWorkerInfo.getToRemovedBlocks();
         if (toRemovedBlocks.size() != 0) {
-          return new Command(CommandType.Free, toRemovedBlocks);
+          return new Command(CommandType.Free, toRemovedBlocks, new ArrayList<ClientBlockInfo>());
         }
       }
     }
 
-    return new Command(CommandType.Nothing, new ArrayList<Long>());
+    return new Command(CommandType.Nothing, new ArrayList<Long>(),
+        new ArrayList<ClientBlockInfo>());
   }
 
   /**
@@ -2425,9 +2559,8 @@ public class MasterInfo extends ImageWriter {
    */
   @Override
   public void writeImage(ObjectWriter objWriter, DataOutputStream dos) throws IOException {
-    ImageElement ele =
-        new ImageElement(ImageElementType.Version).withParameter("version",
-            Constants.JOURNAL_VERSION);
+    ImageElement ele = new ImageElement(ImageElementType.Version).withParameter("version",
+        Constants.JOURNAL_VERSION);
 
     writeElement(objWriter, dos, ele);
 
@@ -2440,13 +2573,154 @@ public class MasterInfo extends ImageWriter {
       mRoot.writeImage(objWriter, dos);
       mRawTables.writeImage(objWriter, dos);
 
-      ele =
-          new ImageElement(ImageElementType.Checkpoint)
-              .withParameter("inodeCounter", mInodeCounter.get())
-              .withParameter("editTransactionCounter", mCheckpointInfo.getEditTransactionCounter())
-              .withParameter("dependencyCounter", mCheckpointInfo.getDependencyCounter());
+      ele = new ImageElement(ImageElementType.Checkpoint)
+          .withParameter("inodeCounter", mInodeCounter.get())
+          .withParameter("editTransactionCounter", mCheckpointInfo.getEditTransactionCounter())
+          .withParameter("dependencyCounter", mCheckpointInfo.getDependencyCounter());
 
       writeElement(objWriter, dos, ele);
     }
   }
+
+  public Map<NetAddress, Long> getmWorkerAddressToId() {
+    return mWorkerAddressToId;
+  }
+
+  public static Logger getLog() {
+    return LOG;
+  }
+
+  public Map<Long, List<WorkerBlockInfo>> worker_getBlocksToEvict(NetAddress workerAddress,
+      Set<Long> lockedBlocks, List<Long> candidateDirIds, long blockId, long requestBytes,
+      boolean isLastTier) {
+    // return mEvictGlobal.getBlocksToEvict(workerAddress, lockedBlocks, candidateDirIds, blockId,
+    // requestBytes, isLastTier);
+    return null;
+  }
+
+  public void accessFile(int fileId) {
+    mEvictGlobalInfo.accessFile(fileId);
+  }
+
+  public Map<Integer, Long> worker_getMemAllocationPlan() {
+    return mEvictGlobalInfo.getMemAllocationPlan();
+  }
+
+  public Map<Integer, Inode> getmFileIdToInodes() {
+    return mFileIdToInodes;
+  }
+
+  private Object mAccessCountLock = new Object();
+  private int mAccessCount = 0;
+  private Set<Long> mCacheMissRemote = new HashSet<Long>();
+  private Set<Long> mCacheMissDisk = new HashSet<Long>();
+  private Set<Long> mCacheMissAll = new HashSet<Long>();
+  private Set<Long> mCacheHit = new HashSet<Long>();
+
+  public List<Integer> user_getAccessCount() {
+    synchronized (mAccessCountLock) {
+      return Arrays.asList(mAccessCount, mCacheHit.size(), mCacheMissAll.size(),
+          mCacheMissRemote.size(), mCacheMissDisk.size());
+    }
+  }
+
+  public void user_cleanAccessCount() {
+    synchronized (mAccessCountLock) {
+      mAccessCount = 0;
+      mCacheMissAll.clear();
+      mCacheMissRemote.clear();
+      mCacheMissDisk.clear();
+      mCacheHit.clear();
+    }
+  }
+
+  @Deprecated
+  public void user_addAccessOne() {
+    synchronized (mAccessCountLock) {
+      mAccessCount ++;
+    }
+  }
+
+  public void user_addAccess(int count) {
+    synchronized (mAccessCountLock) {
+      mAccessCount += count;
+    }
+  }
+
+  public void user_addBlockReadSourceSet(Set<Long> blocks, int source) {
+    synchronized (mAccessCountLock) {
+      if (source == BlockAccessInfo.READ_MEMORY) {
+        mCacheHit.addAll(blocks);
+      } else if (source == BlockAccessInfo.READ_REMOTE) {
+        mCacheMissRemote.addAll(blocks);
+        mCacheMissAll.addAll(blocks);
+      } else if (source == BlockAccessInfo.READ_UFS) {
+        mCacheMissDisk.addAll(blocks);
+        mCacheMissAll.addAll(blocks);
+      }
+      LOG.info(" ###user_addBlockReadSourceSet: source {}, blocks {}###   ", source, blocks);
+    }
+  }
+
+  @Deprecated
+  public void user_cacheMissSet(Set<Long> blocks, int type) {
+    synchronized (mAccessCountLock) {
+      if (type == 1) {
+        mCacheMissAll.addAll(blocks);
+      } else if (type == 2) {
+        mCacheMissRemote.addAll(blocks);
+      } else {
+        mCacheMissDisk.addAll(blocks);
+      }
+      LOG.info("*****cache miss: {}, type: {}*****", blocks.size(), type);
+    }
+  }
+
+
+  public void user_cacheHitSet(Set<Long> blocks) {
+    synchronized (mAccessCountLock) {
+      mCacheHit.addAll(blocks);
+    }
+  }
+
+  public long user_getMemoryConsumption(String path) throws InvalidPathException, IOException {
+    Inode inode = getInode(new TachyonURI(path));
+    if (inode.isDirectory()) {
+      throw new IOException(path + " is a folder!");
+    }
+    return ((InodeFile) inode).getMemoryConsumptionBytes();
+  }
+
+  private Set<UserBlockAccessInfo> mBlockAccessInfos = new HashSet<UserBlockAccessInfo>();
+
+  public void user_addBlockAccessInfo(Set<UserBlockAccessInfo> blocks) {
+    synchronized (mBlockAccessInfos) {
+      mBlockAccessInfos.addAll(blocks);
+    }
+  }
+
+  public void user_addBlockAccessInfo(UserBlockAccessInfo info) {
+    synchronized (mBlockAccessInfos) {
+      mBlockAccessInfos.add(info);
+    }
+  }
+
+  public void user_cleanBlockAccessInfo() {
+    synchronized (mBlockAccessInfos) {
+      mBlockAccessInfos.clear();
+    }
+  }
+
+  public Set<UserBlockAccessInfo> user_getBlockAccessInfo() {
+    synchronized (mBlockAccessInfos) {
+      return new HashSet<UserBlockAccessInfo>(mBlockAccessInfos);
+    }
+  }
+
+  public Map<Integer, Integer> user_getFileAccessCount() {
+    synchronized (mRoot) {
+      return mEvictGlobalInfo.getFileAccessCount();
+    }
+  }
+
 }

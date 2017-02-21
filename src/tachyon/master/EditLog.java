@@ -123,8 +123,8 @@ public final class EditLog {
       try {
         switch (op.mType) {
           case ADD_BLOCK: {
-            info.opAddBlock(op.getInt("fileId"), op.getInt("blockIndex"),
-                op.getLong("blockLength"), op.getLong("opTimeMs"));
+            info.opAddBlock(op.getInt("fileId"), op.getInt("blockIndex"), op.getLong("blockLength"),
+                op.getLong("opTimeMs"));
             break;
           }
           case ADD_CHECKPOINT: {
@@ -211,7 +211,7 @@ public final class EditLog {
       while (ufs.exists(toDelete)) {
         LOG.info("Deleting editlog " + toDelete);
         ufs.delete(toDelete, true);
-        sBackUpLogStartNum++;
+        sBackUpLogStartNum ++;
         toDelete = CommonUtils.concat(folder, sBackUpLogStartNum + ".editLog");
       }
     } catch (IOException e) {
@@ -274,7 +274,7 @@ public final class EditLog {
           mUfs.rename(toRename, dstPath);
           LOG.info("Rename " + toRename + " to " + dstPath);
           currentLogFileNum ++;
-          sBackUpLogStartNum++;
+          sBackUpLogStartNum ++;
           toRename = CommonUtils.concat(folder, sBackUpLogStartNum + ".editLog");
           dstPath = CommonUtils.concat(folder, currentLogFileNum + ".editLog");
         }
@@ -392,8 +392,8 @@ public final class EditLog {
     }
 
     EditLogOperation operation =
-        new EditLogOperation(EditLogOperationType.COMPLETE_FILE, ++mTransactionId).withParameter(
-            "fileId", fileId).withParameter("opTimeMs", opTimeMs);
+        new EditLogOperation(EditLogOperationType.COMPLETE_FILE, ++mTransactionId)
+            .withParameter("fileId", fileId).withParameter("opTimeMs", opTimeMs);
     writeOperation(operation);
   }
 
@@ -486,10 +486,9 @@ public final class EditLog {
       return;
     }
 
-    EditLogOperation operation =
-        new EditLogOperation(EditLogOperationType.DELETE, ++mTransactionId)
-            .withParameter("fileId", fileId).withParameter("recursive", recursive)
-            .withParameter("opTimeMs", opTimeMs);
+    EditLogOperation operation = new EditLogOperation(EditLogOperationType.DELETE, ++mTransactionId)
+        .withParameter("fileId", fileId).withParameter("recursive", recursive)
+        .withParameter("opTimeMs", opTimeMs);
     writeOperation(operation);
   }
 
@@ -557,10 +556,9 @@ public final class EditLog {
       return;
     }
 
-    EditLogOperation operation =
-        new EditLogOperation(EditLogOperationType.RENAME, ++mTransactionId)
-            .withParameter("fileId", fileId).withParameter("dstPath", dstPath.toString())
-            .withParameter("opTimeMs", opTimeMs);
+    EditLogOperation operation = new EditLogOperation(EditLogOperationType.RENAME, ++mTransactionId)
+        .withParameter("fileId", fileId).withParameter("dstPath", dstPath.toString())
+        .withParameter("opTimeMs", opTimeMs);
     writeOperation(operation);
   }
 
@@ -576,8 +574,7 @@ public final class EditLog {
 
     _closeActiveStream();
     LOG.info("Edit log max size of " + mMaxLogSize + " bytes reached, rotating edit log");
-    String pathPrefix =
-        path.substring(0, path.lastIndexOf(TachyonURI.SEPARATOR) + 1) + "completed";
+    String pathPrefix = path.substring(0, path.lastIndexOf(TachyonURI.SEPARATOR) + 1) + "completed";
     LOG.info("path: " + path + " prefix: " + pathPrefix);
     try {
       if (!mUfs.exists(pathPrefix)) {
@@ -646,8 +643,8 @@ public final class EditLog {
 
     EditLogOperation operation =
         new EditLogOperation(EditLogOperationType.UPDATE_RAW_TABLE_METADATA, ++mTransactionId)
-            .withParameter("tableId", tableId).withParameter("metadata",
-                Utils.byteBufferToBase64(metadata));
+            .withParameter("tableId", tableId)
+            .withParameter("metadata", Utils.byteBufferToBase64(metadata));
     writeOperation(operation);
   }
 

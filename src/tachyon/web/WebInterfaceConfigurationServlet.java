@@ -62,24 +62,24 @@ public final class WebInterfaceConfigurationServlet extends HttpServlet {
     request.setAttribute("tachyon.workers.folder", "" + mCommonConf.UNDERFS_WORKERS_FOLDER);
     request.setAttribute("tachyon.underfs.hdfs.impl", "" + mCommonConf.UNDERFS_HDFS_IMPL);
     request.setAttribute("tachyon.underfs.glusterfs.impl", "" + mCommonConf.UNDERFS_GLUSTERFS_IMPL);
-    request.setAttribute("tachyon.underfs.glusterfs.volumes", ""
-        + mCommonConf.UNDERFS_GLUSTERFS_VOLUMES);
-    request.setAttribute("tachyon.underfs.glusterfs.mounts", ""
-        + mCommonConf.UNDERFS_GLUSTERFS_MOUNTS);
-    request.setAttribute("tachyon.underfs.glusterfs.mapred.system.dir", ""
-        + mCommonConf.UNDERFS_GLUSTERFS_MR_DIR);
+    request.setAttribute("tachyon.underfs.glusterfs.volumes",
+        "" + mCommonConf.UNDERFS_GLUSTERFS_VOLUMES);
+    request.setAttribute("tachyon.underfs.glusterfs.mounts",
+        "" + mCommonConf.UNDERFS_GLUSTERFS_MOUNTS);
+    request.setAttribute("tachyon.underfs.glusterfs.mapred.system.dir",
+        "" + mCommonConf.UNDERFS_GLUSTERFS_MR_DIR);
     request.setAttribute("tachyon.web.resources", "" + mCommonConf.WEB_RESOURCES);
     request.setAttribute("tachyon.usezookeeper", "" + mCommonConf.USE_ZOOKEEPER);
     request.setAttribute("tachyon.zookeeper.address", "" + mCommonConf.ZOOKEEPER_ADDRESS);
-    request.setAttribute("tachyon.zookeeper.election.path", ""
-        + mCommonConf.ZOOKEEPER_ELECTION_PATH);
+    request.setAttribute("tachyon.zookeeper.election.path",
+        "" + mCommonConf.ZOOKEEPER_ELECTION_PATH);
     request.setAttribute("tachyon.zookeeper.leader.path", "" + mCommonConf.ZOOKEEPER_LEADER_PATH);
     request.setAttribute("tachyon.async.enabled", "" + mCommonConf.ASYNC_ENABLED);
     request.setAttribute("tachyon.max.columns", "" + mCommonConf.MAX_COLUMNS);
-    request.setAttribute("tachyon.max.table.metadata.byte", ""
-        + mCommonConf.MAX_TABLE_METADATA_BYTE);
-    request.setAttribute("tachyon.underfs.hadoop.prefixes", "" 
-        + mCommonConf.DEFAULT_HADOOP_UFS_PREFIX);
+    request.setAttribute("tachyon.max.table.metadata.byte",
+        "" + mCommonConf.MAX_TABLE_METADATA_BYTE);
+    request.setAttribute("tachyon.underfs.hadoop.prefixes",
+        "" + mCommonConf.DEFAULT_HADOOP_UFS_PREFIX);
     request.setAttribute("tachyon.test.mode", "" + mCommonConf.IN_TEST_MODE);
     request.setAttribute("tachyon.master.retry", "" + mCommonConf.MASTER_RETRY_COUNT);
 
@@ -92,11 +92,11 @@ public final class WebInterfaceConfigurationServlet extends HttpServlet {
     request.setAttribute("tachyon.master.web.port", "" + mMasterConf.WEB_PORT);
     request.setAttribute("tachyon.master.web.threads", "" + mMasterConf.WEB_THREAD_COUNT);
     request.setAttribute("tachyon.master.temporary.folder", "" + mMasterConf.TEMPORARY_FOLDER);
-    request.setAttribute("tachyon.master.heartbeat.interval.ms", ""
-        + mMasterConf.HEARTBEAT_INTERVAL_MS);
+    request.setAttribute("tachyon.master.heartbeat.interval.ms",
+        "" + mMasterConf.HEARTBEAT_INTERVAL_MS);
     request.setAttribute("tachyon.master.selector.threads", "" + mMasterConf.SELECTOR_THREADS);
-    request.setAttribute("tachyon.master.queue.size.per.selector", ""
-        + mMasterConf.QUEUE_SIZE_PER_SELECTOR);
+    request.setAttribute("tachyon.master.queue.size.per.selector",
+        "" + mMasterConf.QUEUE_SIZE_PER_SELECTOR);
     request.setAttribute("tachyon.master.server.threads", "" + mMasterConf.SERVER_THREADS);
     request.setAttribute("tachyon.master.worker.timeout.ms", "" + mMasterConf.WORKER_TIMEOUT_MS);
     request.setAttribute("tachyon.master.keytab.file", "" + mMasterConf.KEYTAB);

@@ -20,8 +20,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -43,8 +45,10 @@ import tachyon.TachyonURI;
 import tachyon.UnderFileSystem;
 import tachyon.Users;
 import tachyon.util.CommonUtils;
+import tachyon.util.NetworkUtils;
 import tachyon.worker.BlockHandler;
 import tachyon.worker.SpaceCounter;
+import tachyon.worker.WorkerStorage;
 
 /**
  * Stores and manages block files in storage's directory in different storage systems.
@@ -57,8 +61,8 @@ public final class StorageDir {
   private final ConcurrentMap<Long, Long> mLastBlockAccessTimeMs =
       new ConcurrentHashMap<Long, Long>();
   /** List of added block Ids to be reported */
-  private final BlockingQueue<Long> mAddedBlockIdList = new ArrayBlockingQueue<Long>(
-      Constants.WORKER_BLOCKS_QUEUE_SIZE);
+  private final BlockingQueue<Long> mAddedBlockIdList =
+      new ArrayBlockingQueue<Long>(Constants.WORKER_BLOCKS_QUEUE_SIZE);
   /** List of to be removed block Ids */
   private final Set<Long> mToRemoveBlockIdSet = Collections.synchronizedSet(new HashSet<Long>());
   /** Space counter of the StorageDir */
@@ -81,11 +85,23 @@ public final class StorageDir {
   private final ConcurrentMap<Pair<Long, Long>, Long> mTempBlockAllocatedBytes =
       new ConcurrentHashMap<Pair<Long, Long>, Long>();
   /** Mapping from user Id to list of blocks locked by the user */
-  private final Multimap<Long, Long> mLockedBlocksPerUser = Multimaps
-      .synchronizedMultimap(HashMultimap.<Long, Long>create());
+  private final Multimap<Long, Long> mLockedBlocksPerUser =
+      Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
   /** Mapping from block Id to list of users that lock the block */
-  private final Multimap<Long, Long> mUserPerLockedBlock = Multimaps
-      .synchronizedMultimap(HashMultimap.<Long, Long>create());
+  private final Multimap<Long, Long> mUserPerLockedBlock =
+      Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
+  /**
+   * Newly added!!! It's not good to expose workerStorage in StorageDir
+   */
+  private final WorkerStorage mWorkerStorage;
+  /** For LFU. Map from block id to its access count */
+  private final ConcurrentMap<Long, Integer> mBlockAccessCount =
+      new ConcurrentHashMap<Long, Integer>();
+  /** For MaxMin. Map from file id to consumed bytes. Temp blocks not included. 
+   * For MAXMIN eviction usage. Seems would slow down worker performance.
+   * **/
+  private final HashMap<Integer, Long> mFileConsumption = new HashMap<>();
+  // private final HashMap<Integer, List<Long>> mFileAccessedBlocks = new HashMap<>();
 
   /**
    * Create a new StorageDir.
@@ -97,8 +113,9 @@ public final class StorageDir {
    * @param userTempFolder the temporary folder for users in the StorageDir
    * @param conf the configuration of the under file system
    */
-  StorageDir(long storageDirId, String dirPath, long capacityBytes, String dataFolder,
-      String userTempFolder, Object conf) {
+  StorageDir(WorkerStorage workerStorage, long storageDirId, String dirPath, long capacityBytes,
+      String dataFolder, String userTempFolder, Object conf) {
+    mWorkerStorage = workerStorage;
     mStorageDirId = storageDirId;
     mDirPath = new TachyonURI(dirPath);
     mSpaceCounter = new SpaceCounter(capacityBytes);
@@ -106,6 +123,14 @@ public final class StorageDir {
     mUserTempPath = mDirPath.join(userTempFolder);
     mConf = conf;
     mFs = UnderFileSystem.get(dirPath, conf);
+  }
+
+  /**
+   * for test
+   */
+  StorageDir(long storageDirId, String dirPath, long capacityBytes, String dataFolder,
+      String userTempFolder, Object conf) {
+    this(null, storageDirId, dirPath, capacityBytes, dataFolder, userTempFolder, conf);
   }
 
   /**
@@ -117,6 +142,8 @@ public final class StorageDir {
     synchronized (mLastBlockAccessTimeMs) {
       if (containsBlock(blockId)) {
         mLastBlockAccessTimeMs.put(blockId, System.currentTimeMillis());
+        addBlockCount(blockId);
+        LOG.info("***StorageDir.accessBlock: access block {}***", blockId);
       }
     }
   }
@@ -143,10 +170,20 @@ public final class StorageDir {
   private void addBlockId(long blockId, long sizeBytes, long accessTimeMs, boolean report) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.put(blockId, accessTimeMs);
+      addBlockCount(blockId);
+      int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
       if (mBlockSizes.containsKey(blockId)) {
         mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
+        mWorkerStorage.updateFileDistribution(fileId, -mBlockSizes.get(blockId));
       }
+      // Long cur = mFileConsumption.get(fileId);
+      // if (cur == null) {
+      // cur = 0L;
+      // }
+      // cur += sizeBytes;
+      // mFileConsumption.put(fileId, cur);
       mBlockSizes.put(blockId, sizeBytes);
+      mWorkerStorage.updateFileDistribution(fileId, sizeBytes); // newly added ugly code
       if (report) {
         mAddedBlockIdList.add(blockId);
       }
@@ -177,6 +214,8 @@ public final class StorageDir {
     }
     Long allocatedBytes = mTempBlockAllocatedBytes.remove(blockInfo);
     returnSpace(userId, allocatedBytes - blockSize);
+    // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
+    // -allocatedBytes);
     if (mFs.rename(srcPath, dstPath)) {
       addBlockId(blockId, blockSize, false);
       updateUserOwnBytes(userId, -blockSize);
@@ -194,13 +233,19 @@ public final class StorageDir {
    * @return true if success, false otherwise
    * @throws IOException
    */
-  public boolean cancelBlock(long userId, long blockId) throws IOException {  
+  public boolean cancelBlock(long userId, long blockId) throws IOException {
     String filePath = getUserTempFilePath(userId, blockId);
-    Long allocatedBytes = mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, blockId));
+    Pair<Long, Long> key = new Pair<Long, Long>(userId, blockId);
+    // boolean exist = mTempBlockAllocatedBytes.containsKey(key);
+    Long allocatedBytes = mTempBlockAllocatedBytes.remove(key);
     if (allocatedBytes == null) {
       allocatedBytes = 0L;
     }
     returnSpace(userId, allocatedBytes);
+    // if (exist) {
+    // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), -1,
+    // -allocatedBytes);
+    // }
     if (!mFs.exists(filePath)) {
       return true;
     } else {
@@ -220,7 +265,17 @@ public final class StorageDir {
       mUserPerLockedBlock.remove(blockId, userId);
     }
     for (Long tempBlockId : tempBlockIdList) {
-      mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, tempBlockId));
+      Long allocatedBytes =
+          mTempBlockAllocatedBytes.remove(new Pair<Long, Long>(userId, tempBlockId));
+      // if (allocatedBytes != null) {
+      // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(tempBlockId),
+      // -1, allocatedBytes);
+      // } else {
+      // LOG.info(
+      // "\n!!!find a block with no allocated bytes, " + "which may not be deleted before!!!\n");
+      // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(tempBlockId),
+      // -1, 0);
+      // }
     }
     try {
       mFs.delete(getUserTempPath(userId), true);
@@ -283,12 +338,13 @@ public final class StorageDir {
    */
   public boolean deleteBlock(long blockId) throws IOException {
     Long accessTimeMs = mLastBlockAccessTimeMs.remove(blockId);
+    deleteBlockCount(blockId);
     if (accessTimeMs == null) {
       LOG.warn("Block does not exist in current StorageDir! blockId:{}", blockId);
       return false;
     }
     String blockfile = getBlockFilePath(blockId);
-    // Should check lock status here 
+    // Should check lock status here
     if (!isBlockLocked(blockId)) {
       if (!mFs.delete(blockfile, false)) {
         LOG.error("Failed to delete block file! filename:{}", blockfile);
@@ -310,6 +366,19 @@ public final class StorageDir {
   private void deleteBlockId(long blockId) {
     synchronized (mLastBlockAccessTimeMs) {
       mLastBlockAccessTimeMs.remove(blockId);
+      deleteBlockCount(blockId);
+      long sizeBytes = getBlockSize(blockId);
+      int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
+      mWorkerStorage.updateFileDistribution(fileId, -sizeBytes);
+      // Long cur = mFileConsumption.get(fileId);
+      // if (cur != null) {
+      // cur -= sizeBytes;
+      // if (cur > 0) {
+      // mFileConsumption.put(fileId, cur);
+      // } else {
+      // mFileConsumption.remove(fileId);
+      // }
+      // }
       mSpaceCounter.returnUsedBytes(mBlockSizes.remove(blockId));
       if (mAddedBlockIdList.contains(blockId)) {
         mAddedBlockIdList.remove(blockId);
@@ -350,12 +419,15 @@ public final class StorageDir {
   public ByteBuffer getBlockData(long blockId, long offset, int length) throws IOException {
     BlockHandler bh = getBlockHandler(blockId);
     try {
-      return bh.read(offset, length);
+      ByteBuffer buffer = bh.read(offset, length);
+      // return NetworkUtils.clone(buffer);
+      return buffer;
     } finally {
       bh.close();
       accessBlock(blockId);
     }
   }
+
 
   /**
    * Get file path of the block file
@@ -452,20 +524,31 @@ public final class StorageDir {
     return mLastBlockAccessTimeMs.entrySet();
   }
 
+  public long getLastBlockAccessTimeMs(long blockId) {
+    synchronized (mLastBlockAccessTimeMs) {
+      Long ret = mLastBlockAccessTimeMs.get(blockId);
+      return ret == null ? -1 : ret;
+    }
+  }
+
   /**
    * Get size of locked blocks in bytes in current StorageDir
    * 
    * @return size of locked blocks in bytes in current StorageDir
    */
-  public long getLockedSizeBytes() {
+  public synchronized long getLockedSizeBytes() {
     long lockedBytes = 0;
-    for (long blockId : mUserPerLockedBlock.keySet()) {
-      Long blockSize = mBlockSizes.get(blockId);
-      if (blockSize != null) {
-        lockedBytes += blockSize;
+    try {
+      for (long blockId : mUserPerLockedBlock.keySet()) {
+        Long blockSize = mBlockSizes.get(blockId);
+        if (blockSize != null) {
+          lockedBytes += blockSize;
+        }
       }
+      return lockedBytes;
+    } catch (Exception exception) {
+      return this.getCapacityBytes();
     }
-    return lockedBytes;
   }
 
   /**
@@ -710,6 +793,9 @@ public final class StorageDir {
    */
   public void updateTempBlockAllocatedBytes(long userId, long blockId, long sizeBytes) {
     Pair<Long, Long> blockInfo = new Pair<Long, Long>(userId, blockId);
+    // do not add temp block count here. Block count is pre-added.
+    // mWorkerStorage.updateFileTempBlocks(tachyon.master.BlockInfo.computeInodeId(blockId), 0,
+    // sizeBytes);
     Long oldSize = mTempBlockAllocatedBytes.putIfAbsent(blockInfo, sizeBytes);
     if (oldSize != null) {
       while (!mTempBlockAllocatedBytes.replace(blockInfo, oldSize, oldSize + sizeBytes)) {
@@ -740,4 +826,41 @@ public final class StorageDir {
       }
     }
   }
+
+  /**
+   * Get all locked Blocks. For use in global eviction plan.
+   * 
+   * @return
+   */
+  public Set<Long> getLockedBlocks() {
+    return mUserPerLockedBlock.keySet();
+  }
+
+  private void addBlockCount(long blockId) {
+    synchronized (mBlockAccessCount) {
+      Integer count = mBlockAccessCount.get(blockId);
+      if (count == null) {
+        count = 0;
+      }
+      count ++;
+      mBlockAccessCount.put(blockId, count);
+    }
+  }
+
+  private void deleteBlockCount(long blockId) {
+    // synchronized (mBlockAccessCount) {
+    // mBlockAccessCount.remove(blockId);
+    // }
+  }
+
+  public Set<Entry<Long, Integer>> getBlockAccessCount() {
+    return mBlockAccessCount.entrySet();
+  }
+
+  public Map<Integer, Long> getFileConsumptionClone() {
+    synchronized (mLastBlockAccessTimeMs) {
+      return new HashMap<>(mFileConsumption);
+    }
+  }
+
 }

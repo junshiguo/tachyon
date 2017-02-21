@@ -21,6 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.logging.Log;
+
 import tachyon.Constants;
 import tachyon.thrift.ClientWorkerInfo;
 import tachyon.thrift.NetAddress;

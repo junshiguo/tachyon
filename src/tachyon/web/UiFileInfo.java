@@ -31,8 +31,8 @@ public final class UiFileInfo {
    * Provides ordering of {@link tachyon.web.UiFileInfo} based off a string comparison of the
    * absolute paths.
    */
-  public static final Ordering<UiFileInfo> PATH_STRING_COMPARE = Ordering.natural().onResultOf(
-      new Function<UiFileInfo, Comparable<String>>() {
+  public static final Ordering<UiFileInfo> PATH_STRING_COMPARE =
+      Ordering.natural().onResultOf(new Function<UiFileInfo, Comparable<String>>() {
         @Override
         public Comparable<String> apply(UiFileInfo input) {
           return input.mAbsolutePath;

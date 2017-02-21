@@ -50,16 +50,16 @@ public class Dependency extends ImageWriter {
    * @throws IOException
    */
   static Dependency loadImage(ImageElement ele) throws IOException {
-    Dependency dep =
-        new Dependency(ele.getInt("depID"), ele.get("parentFiles",
-            new TypeReference<List<Integer>>() {}), ele.get("childrenFiles",
-            new TypeReference<List<Integer>>() {}), ele.getString("commandPrefix"),
-            ele.getByteBufferList("data"), ele.getString("comment"), ele.getString("framework"),
-            ele.getString("frameworkVersion"), ele.get("dependencyType", DependencyType.class),
-            ele.get("parentDeps", new TypeReference<List<Integer>>() {}),
-            ele.getLong("creationTimeMs"));
-    dep.resetUncheckpointedChildrenFiles(ele.get("unCheckpointedChildrenFiles",
-        new TypeReference<List<Integer>>() {}));
+    Dependency dep = new Dependency(ele.getInt("depID"),
+        ele.get("parentFiles", new TypeReference<List<Integer>>() {}),
+        ele.get("childrenFiles", new TypeReference<List<Integer>>() {}),
+        ele.getString("commandPrefix"), ele.getByteBufferList("data"), ele.getString("comment"),
+        ele.getString("framework"), ele.getString("frameworkVersion"),
+        ele.get("dependencyType", DependencyType.class),
+        ele.get("parentDeps", new TypeReference<List<Integer>>() {}),
+        ele.getLong("creationTimeMs"));
+    dep.resetUncheckpointedChildrenFiles(
+        ele.get("unCheckpointedChildrenFiles", new TypeReference<List<Integer>>() {}));
 
     return dep;
   }
@@ -301,18 +301,15 @@ public class Dependency extends ImageWriter {
   @Override
   public synchronized void writeImage(ObjectWriter objWriter, DataOutputStream dos)
       throws IOException {
-    ImageElement ele =
-        new ImageElement(ImageElementType.Dependency).withParameter("depID", mId)
-            .withParameter("parentFiles", mParentFiles)
-            .withParameter("childrenFiles", mChildrenFiles)
-            .withParameter("commandPrefix", mCommandPrefix)
-            .withParameter("data", Utils.byteBufferListToBase64(mData))
-            .withParameter("comment", mComment).withParameter("framework", mFramework)
-            .withParameter("frameworkVersion", mFrameworkVersion)
-            .withParameter("depType", mDependencyType)
-            .withParameter("parentDeps", mParentDependencies)
-            .withParameter("creationTimeMs", mCreationTimeMs)
-            .withParameter("unCheckpointedChildrenFiles", getUncheckpointedChildrenFiles());
+    ImageElement ele = new ImageElement(ImageElementType.Dependency).withParameter("depID", mId)
+        .withParameter("parentFiles", mParentFiles).withParameter("childrenFiles", mChildrenFiles)
+        .withParameter("commandPrefix", mCommandPrefix)
+        .withParameter("data", Utils.byteBufferListToBase64(mData))
+        .withParameter("comment", mComment).withParameter("framework", mFramework)
+        .withParameter("frameworkVersion", mFrameworkVersion)
+        .withParameter("depType", mDependencyType).withParameter("parentDeps", mParentDependencies)
+        .withParameter("creationTimeMs", mCreationTimeMs)
+        .withParameter("unCheckpointedChildrenFiles", getUncheckpointedChildrenFiles());
     writeElement(objWriter, dos, ele);
   }
 }

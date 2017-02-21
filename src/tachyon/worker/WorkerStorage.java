@@ -30,6 +30,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -49,6 +50,7 @@ import tachyon.StorageLevelAlias;
 import tachyon.UnderFileSystem;
 import tachyon.Users;
 import tachyon.conf.CommonConf;
+import tachyon.conf.UserConf;
 import tachyon.conf.WorkerConf;
 import tachyon.master.MasterClient;
 import tachyon.thrift.BlockInfoException;
@@ -62,8 +64,10 @@ import tachyon.thrift.NetAddress;
 import tachyon.thrift.OutOfSpaceException;
 import tachyon.thrift.SuspectedFileSizeException;
 import tachyon.thrift.TachyonException;
+import tachyon.thrift.WorkerBlockInfo;
 import tachyon.util.CommonUtils;
 import tachyon.util.ThreadFactoryUtils;
+import tachyon.worker.hierarchy.BlockInfo;
 import tachyon.worker.hierarchy.StorageDir;
 import tachyon.worker.hierarchy.StorageTier;
 
@@ -304,6 +308,18 @@ public class WorkerStorage {
   /** Mapping from user id to ids of temporary blocks which are being written by the user */
   private final Multimap<Long, Long> mUserIdToTempBlockIds =
       Multimaps.synchronizedMultimap(HashMultimap.<Long, Long>create());
+  /**
+   * Mapping from file id to used memory space. This is newly added!!! Updated in
+   * {@link tachyon.worker.hierarchy.StorageDir#addBlockId} and
+   * {@link tachyon.worker.hierarchy.StorageDir#deleteBlockId}
+   */
+  private Map<Integer, Long> mFileDistribution = new ConcurrentHashMap<Integer, Long>();
+  /**
+   * Mapping from file id to its temp block counts and already used temp bytes. This.is newly
+   * added!!! Consistent with mTempBlockLocation.
+   */
+  // private Map<Integer, Pair<Integer, Long>> mFileTempBlockCountAndUsedBytes =
+  // new HashMap<Integer, Pair<Integer, Long>>();
 
   /**
    * Main logic behind the worker process.
@@ -497,6 +513,7 @@ public class WorkerStorage {
       long blockSize = storageDir.getBlockSize(blockId);
       mMasterClient.worker_cacheBlock(mWorkerId, getUsedBytes(), storageDir.getStorageDirId(),
           blockId, blockSize);
+      LOG.info("***WorkerStorage.cacheBlock: cache block {} in worker***", blockId);
     }
   }
 
@@ -590,6 +607,11 @@ public class WorkerStorage {
       }
     }
     return null;
+  }
+
+  public StorageDir getStorageDirByDirId(long storageDirId) {
+    StorageTier storageTier = mStorageTiers.get(StorageDirId.getStorageLevel(storageDirId));
+    return storageTier.getmDirs()[StorageDirId.getStorageDirIndex(storageDirId)];
   }
 
   /**
@@ -687,7 +709,7 @@ public class WorkerStorage {
         }
       }
       StorageTier curTier = new StorageTier(level, alias, dirPaths, dirCapacities, mDataFolder,
-          mUserFolder, nextStorageTier, null); // TODO add conf for UFS
+          mUserFolder, nextStorageTier, null, this); // TODO add conf for UFS
       curTier.initialize();
       mCapacityBytes += curTier.getCapacityBytes();
       mStorageTiers.set(level, curTier);
@@ -734,7 +756,7 @@ public class WorkerStorage {
     } else if (StorageDirId.getStorageLevelAliasValue(storageDir.getStorageDirId()) != mStorageTiers
         .get(0).getAlias().getValue()) {
       long blockSize = storageDir.getBlockSize(blockId);
-      StorageDir dstStorageDir = requestSpace(null, userId, blockSize);
+      StorageDir dstStorageDir = requestSpace(null, userId, blockSize, blockId);
       if (dstStorageDir == null) {
         LOG.error("Failed to promote block! blockId:{}", blockId);
         storageDir.unlockBlock(blockId, userId);
@@ -809,7 +831,7 @@ public class WorkerStorage {
           .format("Block file is being written! userId(%d)" + " blockId(%d)", userId, blockId));
     }
 
-    StorageDir storageDir = requestSpace(null, userId, initialBytes);
+    StorageDir storageDir = requestSpace(null, userId, initialBytes, blockId);
     if (storageDir == null) {
       throw new OutOfSpaceException(
           String.format("Failed to allocate space for block! blockId(%d)" + " sizeBytes(%d)",
@@ -831,7 +853,8 @@ public class WorkerStorage {
    * @param requestBytes The requested space size, in bytes
    * @return StorageDir assigned, null if failed
    */
-  private StorageDir requestSpace(StorageDir dirCandidate, long userId, long requestBytes) {
+  private StorageDir requestSpace(StorageDir dirCandidate, long userId, long requestBytes,
+      long blockId) {
     Set<Integer> pinList;
 
     try {
@@ -844,12 +867,14 @@ public class WorkerStorage {
     StorageDir dir = null;
     List<Long> removedBlockIds = new ArrayList<Long>();
     try {
+      int fileId = tachyon.master.BlockInfo.computeInodeId(blockId);
       if (dirCandidate == null) {
         // if StorageDir candidate is not set, request space from all available StorageDirs
-        dir = mStorageTiers.get(0).requestSpace(userId, requestBytes, pinList, removedBlockIds);
+        dir = mStorageTiers.get(0).requestSpace(userId, requestBytes, pinList, removedBlockIds,
+            fileId);
       } else { // request space from the StorageDir specified
         if (mStorageTiers.get(0).requestSpace(dirCandidate, userId, requestBytes, pinList,
-            removedBlockIds)) {
+            removedBlockIds, fileId)) {
           dir = dirCandidate;
         }
       }
@@ -881,7 +906,7 @@ public class WorkerStorage {
       throw new FileDoesNotExistException("Temporary block file doesn't exist! blockId:" + blockId);
     }
 
-    if (storageDir == requestSpace(storageDir, userId, requestBytes)) {
+    if (storageDir == requestSpace(storageDir, userId, requestBytes, blockId)) {
       storageDir.updateTempBlockAllocatedBytes(userId, blockId, requestBytes);
       return true;
     } else {
@@ -978,15 +1003,262 @@ public class WorkerStorage {
     return null;
   }
 
-  public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) {
-    try {
-      RemoteBlockCache block = new RemoteBlockCache(this, userId, blockInfo);
-      block.cache();
-      return true;
-    } catch (OutOfSpaceException | FileAlreadyExistException | IOException | TachyonException
-        | FileDoesNotExistException e) {
-      LOG.error(e.getMessage());
-      return false;
+  // public boolean master_cacheFromRemote(long userId, ClientBlockInfo blockInfo) {
+  // try {
+  // RemoteBlockCache block = new RemoteBlockCache(this, userId, blockInfo);
+  // block.cache();
+  // return true;
+  // } catch (OutOfSpaceException | FileAlreadyExistException | IOException | TachyonException
+  // | FileDoesNotExistException e) {
+  // LOG.error(e.getMessage());
+  // return false;
+  // }
+  // }
+
+  // public boolean master_cacheFromRemote(long userId, List<ClientBlockInfo> blockInfos) {
+  // boolean ret = true;
+  // for (ClientBlockInfo blockInfo : blockInfos) {
+  // if (master_cacheFromRemote(userId, blockInfo) == false) {
+  // ret = false;
+  // }
+  // }
+  // return ret;
+  // }
+
+  public NetAddress getmWorkerAddress() {
+    return mWorkerAddress;
+  }
+
+  public ArrayList<StorageTier> getmStorageTiers() {
+    return mStorageTiers;
+  }
+
+  public BlockInfo getBlockInfo(WorkerBlockInfo workerBlockInfo) {
+    return new BlockInfo(getStorageDirByDirId(workerBlockInfo.storageDirId),
+        workerBlockInfo.blockId, workerBlockInfo.blockSize);
+  }
+
+  /**
+   * called by {@link tachyon.worker.hierarchy.StorageDir#addBlockId} and
+   * {@link tachyon.worker.hierarchy.StorageDir#deleteBlockId}
+   * 
+   * @param fileId
+   * @param diff
+   */
+  public void updateFileDistribution(int fileId, long diff) {
+    synchronized (mFileDistribution) {
+      if (mFileDistribution.containsKey(fileId)) {
+        long value = mFileDistribution.get(fileId) + diff;
+        if (value > 0) {
+          mFileDistribution.put(fileId, value);
+        } else {
+          mFileDistribution.remove(fileId);
+        }
+      } else {
+        mFileDistribution.put(fileId, diff);
+      }
     }
+  }
+
+  public Map<Integer, Long> getFileDistributionClone() {
+    synchronized (mFileDistribution) {
+      return new HashMap<>(mFileDistribution);
+    }
+  }
+
+  public void setFileDistribution(Map<Integer, Long> newDistribution) {
+    synchronized (mFileDistribution) {
+      mFileDistribution = newDistribution;
+    }
+  }
+
+  private Map<Integer, Long> mMemAllocationPlan = new HashMap<>();
+
+  public Map<Integer, Long> getMemAllocationPlan() {
+    try {
+      mMemAllocationPlan = mMasterClient.worker_getMemAllocationPlan();
+      return mMemAllocationPlan;
+    } catch (IOException e) {
+      LOG.error(e.getMessage());
+    }
+    mMemAllocationPlan = new HashMap<>();
+    return mMemAllocationPlan;
+  }
+
+  public Map<Integer, Integer> getFileAccessTimes() throws IOException {
+    return mMasterClient.worker_getFileAccessTimes();
+  }
+
+  // public int getFileTempBlockCount(int fileId) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (fileInfo != null) {
+  // return fileInfo.getFirst();
+  // }
+  // return 0;
+  // }
+  // }
+  //
+  // public long getFileTempSizeBytes(int fileId) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (fileInfo != null) {
+  // return fileInfo.getSecond();
+  // }
+  // return 0;
+  // }
+  // }
+  //
+  // public long getFileTempReserveBytes(int fileId) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (fileInfo != null) {
+  // long ret =
+  // UserConf.get().DEFAULT_BLOCK_SIZE_BYTE * fileInfo.getFirst() - fileInfo.getSecond();
+  // if (ret > 0) {
+  // return ret;
+  // }
+  // }
+  // return 0;
+  // }
+  // }
+  //
+  // public long getFileTempReserveBytes() {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // long ret = 0;
+  // long temp = 0;
+  // for (int fileId : mFileTempBlockCountAndUsedBytes.keySet()) {
+  // Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // temp = UserConf.get().DEFAULT_BLOCK_SIZE_BYTE * fileInfo.getFirst() - fileInfo.getSecond();
+  // if (temp > 0) {
+  // ret += temp;
+  // }
+  // }
+  // return ret;
+  // }
+  // }
+  //
+  // public long getFileTempMaxBytes(int fileId) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (fileInfo != null) {
+  // return UserConf.get().DEFAULT_BLOCK_SIZE_BYTE * fileInfo.getFirst();
+  // }
+  // return 0;
+  // }
+  // }
+  //
+  // public void updateFileTempBlocks(int fileId, int countDiff, long sizeBytesDiff) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> fileTemp = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (fileTemp != null) {
+  // int count = fileTemp.getFirst() + countDiff;
+  // if (count == 0) {
+  // mFileTempBlockCountAndUsedBytes.remove(fileId);
+  // } else {
+  // fileTemp.setFirst(count);
+  // fileTemp.setSecond(fileTemp.getSecond() + sizeBytesDiff);
+  // mFileTempBlockCountAndUsedBytes.put(fileId, fileTemp);
+  // }
+  // } else if (countDiff > 0) {
+  // mFileTempBlockCountAndUsedBytes.put(fileId, new Pair<>(countDiff, sizeBytesDiff));
+  // }
+  // // LOG.info(
+  // // "***WorkerStorage.updateFileTempBlocks: fileid {}, count diff {},"
+  // // + " sizeBytes diff {} ({}MB)***",
+  // // fileId, countDiff, sizeBytesDiff, sizeBytesDiff / 1024 / 1024);
+  // }
+  // }
+  //
+  // /**
+  // * check empty space and memAllocation plan to decide whether to allow file with fileId to
+  // create
+  // * blockoutstream.
+  // *
+  // * This is only used in TRY_CACHE readtype. When such a read instream try to create
+  // * {@link tachyon.client.BlockOutStream} resulting in creating a
+  // * {@link tachyon.client.RemoteBlockInstream} and readType is TRY_CACHE, it should first call
+  // this
+  // * method to decide whether to cache the block or not.
+  // *
+  // * In this method, the temp block count of a file is added to preserve memory. Temp block count
+  // in
+  // * {@link this#mFileTempBlockCountAndUsedBytes} should only be added here!
+  // *
+  // * @param fileId
+  // * @return
+  // */
+  // public synchronized boolean canCreateBlock(int fileId) {
+  // long totalUsed = getUsedBytes();
+  // long totalReserved = getFileTempReserveBytes();
+  // long left = mCapacityBytes - totalUsed - totalReserved;
+  // LOG.info("***canCreateBlock: capacity {}MB, total used {}Mb, totalReserved {}MB***",
+  // mCapacityBytes / 1024 / 1024, totalUsed / 1024 / 1024, totalReserved / 1024 / 1024);
+  // long tempMax = getFileTempReserveBytes(fileId);
+  // Long allocated = getMemAllocationPlan().get(fileId);
+  // if (allocated == null) {
+  // allocated = 0L;
+  // }
+  // Long used;
+  // synchronized (mFileDistribution) {
+  // used = mFileDistribution.get(fileId);
+  // }
+  // if (used == null) {
+  // used = 0L;
+  // }
+  // LOG.info(
+  // "***canCreateBlock: system left {}MB, used {}MB, "
+  // + "temp max reserved {}MB, allocated {}MB***",
+  // left / 1024 / 1024, used / 1024 / 1024, tempMax / 1024 / 1024, allocated / 1024 / 1024);
+  // if (left >= UserConf.get().DEFAULT_BLOCK_SIZE_BYTE || used + tempMax < allocated) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> fileInfo = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (fileInfo != null) {
+  // fileInfo.setFirst(fileInfo.getFirst() + 1);
+  // mFileTempBlockCountAndUsedBytes.put(fileId, fileInfo);
+  // } else {
+  // mFileTempBlockCountAndUsedBytes.put(fileId, new Pair<>(1, 0L));
+  // }
+  //
+  // LOG.info("***canCreateBlock: file with id {} can create block. "
+  // + "mFileTempBlockCountAndUsedBytes{}***", fileId, mFileTempBlockCountAndUsedBytes);
+  // return true;
+  // }
+  // }
+  // LOG.info("***canCreateBlock: file with id {} failed to preserve block", fileId);
+  // return false;
+  // }
+  //
+  // public synchronized void cancelTempBlock(int fileId) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // Pair<Integer, Long> pair = mFileTempBlockCountAndUsedBytes.get(fileId);
+  // if (pair != null) {
+  // pair.setFirst(pair.getFirst() - 1);
+  // if (pair.getFirst() == 0) {
+  // mFileTempBlockCountAndUsedBytes.remove(fileId);
+  // } else {
+  // mFileTempBlockCountAndUsedBytes.put(fileId, pair);
+  // }
+  // LOG.info(" !!!what? cancel block! called from RemoteBlockInStream"
+  // + " with mBlockOutStream.cancel() !!!");
+  // }
+  // }
+  // }
+  //
+  // /**
+  // * this should be called seperately
+  // *
+  // * @param fileId
+  // */
+  // public synchronized void clearTempBlockCount(int fileId) {
+  // synchronized (mFileTempBlockCountAndUsedBytes) {
+  // mFileTempBlockCountAndUsedBytes.remove(fileId);
+  // LOG.info(" !!!WorkerStorage.clearTempBlockCount:"
+  // + " clear temp block counts for file with id {}!!! ", fileId);
+  // }
+  // }
+
+  public static Logger getLog() {
+    return LOG;
   }
 }

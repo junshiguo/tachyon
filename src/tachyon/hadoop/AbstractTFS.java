@@ -202,7 +202,7 @@ abstract class AbstractTFS extends FileSystem {
   @Deprecated
   public FSDataOutputStream createNonRecursive(Path cPath, FsPermission permission,
       boolean overwrite, int bufferSize, short replication, long blockSize, Progressable progress)
-      throws IOException {
+          throws IOException {
     TachyonURI path = new TachyonURI(Utils.getPathWithoutScheme(cPath.getParent()));
     fromHdfsToTachyon(path);
     if (!mTFS.exist(path)) {
@@ -235,10 +235,10 @@ abstract class AbstractTFS extends FileSystem {
       FileSystem fs = hdfsPath.getFileSystem(conf);
       if (fs.exists(hdfsPath)) {
         TachyonURI ufsUri = new TachyonURI(mUnderFSAddress);
-        TachyonURI ufsAddrPath = new TachyonURI(ufsUri.getScheme(), ufsUri.getAuthority(),
-            path.getPath());
+        TachyonURI ufsAddrPath =
+            new TachyonURI(ufsUri.getScheme(), ufsUri.getAuthority(), path.getPath());
         // Set the path as the TFS root path.
-        UfsUtils.loadUnderFs(mTFS, path, ufsAddrPath, new PrefixList(null));
+        UfsUtils.loadUnderFs(mTFS, path.getParent(), ufsAddrPath, new PrefixList(null));
       }
     }
   }
@@ -276,8 +276,8 @@ abstract class AbstractTFS extends FileSystem {
           names.add(addr.mHost);
           hosts.add(addr.mHost);
         }
-        blockLocations.add(new BlockLocation(CommonUtils.toStringArray(names), CommonUtils
-            .toStringArray(hosts), offset, info.getLength()));
+        blockLocations.add(new BlockLocation(CommonUtils.toStringArray(names),
+            CommonUtils.toStringArray(hosts), offset, info.getLength()));
       }
     }
 
@@ -307,10 +307,9 @@ abstract class AbstractTFS extends FileSystem {
       throw new FileNotFoundException("File does not exist: " + path);
     }
 
-    FileStatus ret =
-        new FileStatus(file.length(), file.isDirectory(), file.getDiskReplication(),
-            file.getBlockSizeByte(), file.getCreationTimeMs(), file.getCreationTimeMs(), null,
-            null, null, new Path(mTachyonHeader + tPath));
+    FileStatus ret = new FileStatus(file.length(), file.isDirectory(), file.getDiskReplication(),
+        file.getBlockSizeByte(), file.getCreationTimeMs(), file.getCreationTimeMs(), null, null,
+        null, new Path(mTachyonHeader + tPath));
     return ret;
   }
 
@@ -387,10 +386,9 @@ abstract class AbstractTFS extends FileSystem {
     for (int k = 0; k < files.size(); k ++) {
       ClientFileInfo info = files.get(k);
       // TODO replicate 3 with the number of disk replications.
-      ret[k] =
-          new FileStatus(info.getLength(), info.isFolder, 3, info.getBlockSizeByte(),
-              info.getCreationTimeMs(), info.getCreationTimeMs(), null, null, null, new Path(
-                  mTachyonHeader + info.getPath()));
+      ret[k] = new FileStatus(info.getLength(), info.isFolder, 3, info.getBlockSizeByte(),
+          info.getCreationTimeMs(), info.getCreationTimeMs(), null, null, null,
+          new Path(mTachyonHeader + info.getPath()));
     }
     return ret;
   }

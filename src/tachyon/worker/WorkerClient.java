@@ -66,7 +66,7 @@ public class WorkerClient implements Closeable {
   protected boolean mIsLocal = false;
   protected final ExecutorService mExecutorService;
   protected Future<?> mHeartbeat;
-  
+
   /**
    * Create a WorkerClient, with a given MasterClient.
    * 
@@ -243,9 +243,8 @@ public class WorkerClient implements Closeable {
       HeartbeatExecutor heartBeater =
           new WorkerClientHeartbeatExecutor(this, mMasterClient.getUserId());
       String threadName = "worker-heartbeat-" + mWorkerAddress;
-      mHeartbeat =
-          mExecutorService.submit(new HeartbeatThread(threadName, heartBeater,
-              UserConf.get().HEARTBEAT_INTERVAL_MS));
+      mHeartbeat = mExecutorService.submit(
+          new HeartbeatThread(threadName, heartBeater, UserConf.get().HEARTBEAT_INTERVAL_MS));
 
       try {
         mProtocol.getTransport().open();
@@ -440,5 +439,49 @@ public class WorkerClient implements Closeable {
       throw new IOException(e);
     }
   }
-  
+
+  /**
+   * Used only in {@link tachyon.client.RemoteBlockInStream} in
+   * {@link tachyon.client.ReadType#TRY_CACHE} mode. BlockOutStream is created after calling this
+   * method and get true response.
+   * 
+   * @param fileId
+   * @return
+   * @throws IOException
+   */
+  public synchronized boolean canCreateBlock(int fileId) throws IOException {
+    mustConnect();
+
+    try {
+      return mClient.canCreateBlock(fileId);
+    } catch (TException e) {
+      mConnected = false;
+      throw new IOException(e);
+    }
+  }
+
+  public synchronized void cancelTempBlock(int fileId) throws IOException {
+    mustConnect();
+
+    try {
+      mClient.cancelTempBlock(fileId);
+      return;
+    } catch (TException e) {
+      mConnected = false;
+      throw new IOException(e);
+    }
+  }
+
+  public synchronized void clearTempBlockCount(int fileId) throws IOException {
+    mustConnect();
+
+    try {
+      mClient.clearTempBlockCount(fileId);
+      return;
+    } catch (TException e) {
+      mConnected = false;
+      throw new IOException(e);
+    }
+  }
+
 }

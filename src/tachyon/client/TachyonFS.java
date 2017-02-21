@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,6 +47,7 @@ import tachyon.thrift.ClientFileInfo;
 import tachyon.thrift.ClientRawTableInfo;
 import tachyon.thrift.ClientWorkerInfo;
 import tachyon.thrift.InvalidPathException;
+import tachyon.thrift.UserBlockAccessInfo;
 import tachyon.util.CommonUtils;
 import tachyon.util.ThreadFactoryUtils;
 import tachyon.worker.WorkerClient;
@@ -241,6 +243,14 @@ public class TachyonFS extends AbstractTachyonFS {
   @Override
   public synchronized void close() throws IOException {
     try {
+      // for (Entry<Integer, Set<Long>> entry : mBlockReadSource.entrySet()) {
+      // mMasterClient.user_addBlockReadSourceSet(entry.getValue(), entry.getKey());
+      // }
+      // Set<UserBlockAccessInfo> infos = getUserBlockAccessInfo();
+      // if (!infos.isEmpty()) {
+      // mMasterClient.user_addBlockAccessInfo(getUserBlockAccessInfo());
+      // }
+
       mCloser.close();
     } finally {
       mExecutorService.shutdown();
@@ -533,6 +543,14 @@ public class TachyonFS extends AbstractTachyonFS {
       return null;
     }
     return new TachyonFile(this, clientFileInfo.getId());
+  }
+
+  public synchronized boolean accessFile(TachyonURI path) throws IOException {
+    validateUri(path);
+    ClientFileInfo clientFileInfo = getFileStatus(-1, path, false);
+    // System.out.println("TachyonFS.accessFile: fileid = " + clientFileInfo.getId());
+    mMasterClient.user_accessFile(clientFileInfo.getId());
+    return true;
   }
 
   /**
@@ -991,4 +1009,94 @@ public class TachyonFS extends AbstractTachyonFS {
       throw new IOException("Uri " + uri + " is invalid.");
     }
   }
+
+  public synchronized boolean canCreateBlock(int fileId) throws IOException {
+    return mWorkerClient.canCreateBlock(fileId);
+  }
+
+  public synchronized List<Integer> getAccessCount() throws IOException {
+    return mMasterClient.user_getAccessCount();
+  }
+
+  public synchronized void addAccess(int count) throws IOException {
+    mMasterClient.user_addAccess(count);
+  }
+
+  /**
+   * clean counts of the number of accessed, missed and hited blocks
+   * 
+   * @throws IOException
+   */
+  public synchronized void cleanAccessCount() throws IOException {
+    mMasterClient.user_cleanAccessCount();
+  }
+
+  private final Map<Integer, Set<Long>> mBlockReadSource = new HashMap<Integer, Set<Long>>();
+
+  public synchronized void addBlockReadSource(long blockId, int source) {
+    if (!mBlockReadSource.containsKey(source)) {
+      mBlockReadSource.put(source, new HashSet<Long>());
+    }
+    mBlockReadSource.get(source).add(blockId);
+  }
+
+  public synchronized void cancelTempBlock(int fileId) throws IOException {
+    mWorkerClient.cancelTempBlock(fileId);
+  }
+
+  public synchronized void clearTempBlockCount(int fileId) throws IOException {
+    mWorkerClient.clearTempBlockCount(fileId);
+  }
+
+  public synchronized long getMemoryConsumptionBytes(String path) throws IOException {
+    return mMasterClient.user_getMemoryConsumptionBytes(path);
+  }
+
+  // private Map<Long, BlockAccessInfo> mAccessedBlocksInfo = new HashMap<Long, BlockAccessInfo>();
+
+  private Set<BlockAccessInfo> mAccessedBlocksInfo = new HashSet<BlockAccessInfo>();
+
+  public synchronized void addBlockAccessInfo(BlockAccessInfo accessInfo) throws IOException {
+    // mAccessedBlocksInfo.add(accessInfo);
+    mMasterClient.user_addBlockAccessInfo(accessInfo.toUserBlockAccessInfo());
+  }
+
+  // public synchronized void addBlockAccessInfo(int fileId, long blockId, long blockSize,
+  // int source) {
+  // mAccessedBlocksInfo.put(blockId,
+  // new BlockAccessInfo(fileId, blockId, blockSize, System.currentTimeMillis(), source));
+  // }
+  //
+  // public synchronized void closeBlockAccessInfo(long blockId) {
+  // if (mAccessedBlocksInfo.containsKey(blockId)) {
+  // mAccessedBlocksInfo.get(blockId).setClose();
+  // }
+  // }
+  //
+  // public synchronized void setBlockAccessInfoSource(long blockId, int source) {
+  // if (mAccessedBlocksInfo.containsKey(blockId)) {
+  // mAccessedBlocksInfo.get(blockId).setReadSource(source);
+  // }
+  // }
+
+  public synchronized void cleanBlockAccessInfo() {
+    mAccessedBlocksInfo.clear();
+  }
+
+  private synchronized Set<UserBlockAccessInfo> getUserBlockAccessInfo() {
+    Set<UserBlockAccessInfo> ret = new HashSet<UserBlockAccessInfo>();
+    for (BlockAccessInfo entry : mAccessedBlocksInfo) {
+      ret.add(entry.toUserBlockAccessInfo());
+    }
+    return ret;
+  }
+
+  public synchronized Set<UserBlockAccessInfo> getBlockAccessInfoFromMaster() throws IOException {
+    return mMasterClient.user_getBlockAccessInfo();
+  }
+
+  public synchronized void cleanBlockAccessInfoForMaster() throws IOException {
+    mMasterClient.user_cleanBlockAccessInfo();
+  }
+
 }

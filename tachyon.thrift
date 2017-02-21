@@ -60,17 +60,35 @@ struct ClientRawTableInfo {
   5: binary metadata
 }
 
+struct WorkerBlockInfo {
+  1: i64 storageDirId
+  2: i64 blockId
+  3: i64 blockSize
+}
+
+struct UserBlockAccessInfo {
+  1: i32 fileId
+  2: i64 blockId
+  3: i64 sizeByte
+  4: i64 openTimeMs
+  5: i64 closeTimeMs
+  6: i64 duration
+  7: i32 readSource
+}
+
 enum CommandType {
   Unknown = 0,
   Nothing = 1,
   Register = 2,   	// Ask the worker to re-register.
   Free = 3,		// Ask the worker to free files.
   Delete = 4,		// Ask the worker to delete files.
+  Cache = 5,
 }
 
 struct Command {
   1: CommandType mCommandType
   2: list<i64> mData
+  3: list<ClientBlockInfo> mBlockInfo
 }
 
 exception BlockInfoException {
@@ -263,6 +281,43 @@ service MasterService {
 
   bool user_freepath(1: i32 fileId, 2: string path, 3: bool recursive)
     throws (1: FileDoesNotExistException e)
+
+  void user_accessFile(1: i32 fileId)
+
+  map<i32, i64> worker_getMemAllocationPlan()
+
+  map<i32, i32> worker_getFileAccessTimes()
+
+  /**
+   * total block access; miss count
+   */
+  list<i32> user_getAccessCount()
+
+  void user_cleanAccessCount()
+
+  void user_addAccessOne()
+
+  void user_addAccess(1: i32 count)
+
+  void user_cacheMiss(1: i64 blockId)
+
+  void user_cacheMissSet(1: set<i64> blocks, 2: i32 type)
+
+  void user_cacheHit(1: i64 blockId)
+
+  void user_cacheHitSet(1: set<i64> blocks)
+
+  void user_addBlockReadSourceSet(1: set<i64> blocks, 2: i32 source)
+
+  i64 user_getMemoryConsumptionBytes(1: string path)
+
+  void user_addBlockAccessInfo(1: set<UserBlockAccessInfo> accessedBlocks)
+
+  void user_addBlockAccessInfoOne(1: UserBlockAccessInfo accessedBlock)
+	
+  void user_cleanBlockAccessInfo()
+
+  set<UserBlockAccessInfo> user_getBlockAccessInfo()
 }
 
 service WorkerService {
@@ -344,5 +399,16 @@ service WorkerService {
   /**
    * Newly added. Local worker cache a block from remote.
    */
-  bool master_cacheFromRemote(1: i64 userId, 2: ClientBlockInfo blockInfo)
+  bool master_cacheFromRemote(1: i64 userId, 2: list<ClientBlockInfo> blockInfos)
+
+  /**
+   * Newly added. Master call this to explicitly free a block.
+   */
+  void master_freeBlocks(1: list<i64> blockIds)
+
+  bool canCreateBlock(1: i32 fileId)
+
+  void cancelTempBlock(1: i32 fileId)
+
+  void clearTempBlockCount(1: i32 fileId)
 }

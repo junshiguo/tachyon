@@ -63,8 +63,8 @@ public class UnderFileSystemSingleLocal extends UnderFileSystem {
   @Override
   public OutputStream create(String path, short replication, int blockSizeByte) throws IOException {
     if (replication != 1) {
-      throw new IOException("UnderFileSystemSingleLocal does not provide more than one"
-          + " replication factor");
+      throw new IOException(
+          "UnderFileSystemSingleLocal does not provide more than one" + " replication factor");
     }
     return create(path);
   }

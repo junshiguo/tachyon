@@ -44,8 +44,8 @@ class ImageElement extends JsonObject {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this).add("type", mType)
-        .add("parameters", mParameters).toString();
+    return Objects.toStringHelper(this).add("type", mType).add("parameters", mParameters)
+        .toString();
   }
 
   @Override

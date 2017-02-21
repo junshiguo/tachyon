@@ -30,9 +30,8 @@ public class BlocksLocker {
   // All Blocks has been locked.
   private final Map<Long, Set<Integer>> mLockedBlockIds = new HashMap<Long, Set<Integer>>();
   // Mapping from block id to the StorageDir in which the block is locked
-  private final Map<Long, StorageDir> mLockedBlockIdToStorageDir =
-      new HashMap<Long, StorageDir>();
-  // Each user facing block has a unique block lock id. 
+  private final Map<Long, StorageDir> mLockedBlockIdToStorageDir = new HashMap<Long, StorageDir>();
+  // Each user facing block has a unique block lock id.
   private final AtomicInteger mBlockLockId = new AtomicInteger(0);
 
   private final int mUserId;
@@ -52,7 +51,7 @@ public class BlocksLocker {
    */
   public synchronized StorageDir lock(long blockId, int blockLockId) {
     if (!mLockedBlockIds.containsKey(blockId)) {
-      StorageDir storageDir =  mWorkerStorage.lockBlock(blockId, mUserId);
+      StorageDir storageDir = mWorkerStorage.lockBlock(blockId, mUserId);
       if (storageDir != null) {
         Set<Integer> lockIdSet = new HashSet<Integer>();
         lockIdSet.add(blockLockId);
@@ -75,6 +74,7 @@ public class BlocksLocker {
   public synchronized int getLockId() {
     return mBlockLockId.incrementAndGet();
   }
+
   /**
    * Get StorageDir in which the block is locked
    * 

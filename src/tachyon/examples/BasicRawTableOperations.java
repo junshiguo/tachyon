@@ -108,8 +108,8 @@ public class BasicRawTableOperations implements Callable<Boolean> {
     for (int column = 0; column < COLS; column ++) {
       RawColumn rawColumn = rawTable.getRawColumn(column);
       if (!rawColumn.createPartition(0)) {
-        throw new IOException("Failed to create partition in table " + mTablePath
-            + " under column " + column);
+        throw new IOException(
+            "Failed to create partition in table " + mTablePath + " under column " + column);
       }
 
       ByteBuffer buf = ByteBuffer.allocate(80);
@@ -128,9 +128,9 @@ public class BasicRawTableOperations implements Callable<Boolean> {
 
   public static void main(String[] args) throws IllegalArgumentException {
     if (args.length != 3) {
-      System.out.println("java -cp target/tachyon-" + Version.VERSION
-          + "-jar-with-dependencies.jar "
-          + "tachyon.examples.BasicRawTableOperations <TachyonMasterAddress> <FilePath>");
+      System.out
+          .println("java -cp target/tachyon-" + Version.VERSION + "-jar-with-dependencies.jar "
+              + "tachyon.examples.BasicRawTableOperations <TachyonMasterAddress> <FilePath>");
       System.exit(-1);
     }
     Utils.runExample(new BasicRawTableOperations(new TachyonURI(args[0]), new TachyonURI(args[1]),

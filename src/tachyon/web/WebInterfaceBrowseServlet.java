@@ -96,9 +96,8 @@ public class WebInterfaceBrowseServlet extends HttpServlet {
    */
   private void displayFile(TachyonURI path, HttpServletRequest request, long offset)
       throws FileDoesNotExistException, InvalidPathException, IOException {
-    String masterAddress =
-        Constants.HEADER + mMasterInfo.getMasterAddress().getHostName() + ":"
-            + mMasterInfo.getMasterAddress().getPort();
+    String masterAddress = Constants.HEADER + mMasterInfo.getMasterAddress().getHostName() + ":"
+        + mMasterInfo.getMasterAddress().getPort();
     TachyonFS tachyonClient = TachyonFS.get(new TachyonURI(masterAddress));
     TachyonFile tFile = tachyonClient.getFile(path);
     String fileData = null;
@@ -216,8 +215,8 @@ public class WebInterfaceBrowseServlet extends HttpServlet {
       getServletContext().getRequestDispatcher("/browse.jsp").forward(request, response);
       return;
     } catch (IOException ie) {
-      request.setAttribute("invalidPathError", "Error: File " + currentPath + " is not available "
-          + ie.getMessage());
+      request.setAttribute("invalidPathError",
+          "Error: File " + currentPath + " is not available " + ie.getMessage());
       getServletContext().getRequestDispatcher("/browse.jsp").forward(request, response);
       return;
     }
@@ -253,12 +252,12 @@ public class WebInterfaceBrowseServlet extends HttpServlet {
       request.setAttribute("fileInfos", sub);
     } catch (NumberFormatException nfe) {
       request.setAttribute("fatalError",
-              "Error: offset or limit parse error, " + nfe.getLocalizedMessage());
+          "Error: offset or limit parse error, " + nfe.getLocalizedMessage());
       getServletContext().getRequestDispatcher("/browse.jsp").forward(request, response);
       return;
     } catch (IndexOutOfBoundsException iobe) {
       request.setAttribute("fatalError",
-              "Error: offset or offset + limit is out of bound, " + iobe.getLocalizedMessage());
+          "Error: offset or offset + limit is out of bound, " + iobe.getLocalizedMessage());
       getServletContext().getRequestDispatcher("/browse.jsp").forward(request, response);
       return;
     } catch (IllegalArgumentException iae) {

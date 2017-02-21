@@ -415,9 +415,8 @@ public class TachyonFile implements Comparable<TachyonFile> {
           error = String.format("Offset(%d) is larger than file length(%d)", offset, fileLength);
         }
         if (error == null && len != -1 && offset + len > fileLength) {
-          error =
-              String.format("Offset(%d) plus length(%d) is larger than file length(%d)", offset,
-                  len, fileLength);
+          error = String.format("Offset(%d) plus length(%d) is larger than file length(%d)", offset,
+              len, fileLength);
         }
         if (error != null) {
           throw new IOException(error);
@@ -430,6 +429,9 @@ public class TachyonFile implements Comparable<TachyonFile> {
         FileChannel localFileChannel = closer.register(localFile.getChannel());
         final ByteBuffer buf = localFileChannel.map(FileChannel.MapMode.READ_ONLY, offset, len);
         mTachyonFS.accessLocalBlock(blockId);
+        // newlyadded
+        // mTachyonFS.cacheHit(blockId);
+        // mTachyonFS.addBlockAccessInfo(blockId, len);
         return new TachyonByteBuffer(mTachyonFS, buf, blockId, blockLockId);
       } catch (FileNotFoundException e) {
         LOG.info(localFileName + " is not on local disk.");
@@ -452,8 +454,8 @@ public class TachyonFile implements Comparable<TachyonFile> {
    */
   TachyonByteBuffer readRemoteByteBuffer(ClientBlockInfo blockInfo) {
     // We call into the remote block in stream class to read a remote byte buffer
-    ByteBuffer buf = RemoteBlockInStream.readRemoteByteBuffer(mTachyonFS,
-        blockInfo, 0, blockInfo.length);
+    ByteBuffer buf =
+        RemoteBlockInStream.readRemoteByteBuffer(mTachyonFS, blockInfo, 0, blockInfo.length);
     return (buf == null) ? null : new TachyonByteBuffer(mTachyonFS, buf, blockInfo.blockId, -1);
   }
 
@@ -551,4 +553,5 @@ public class TachyonFile implements Comparable<TachyonFile> {
       throw new RuntimeException("File does not exist anymore: " + mFileId);
     }
   }
+
 }

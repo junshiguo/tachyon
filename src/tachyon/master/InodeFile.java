@@ -28,6 +28,7 @@ import tachyon.thrift.ClientBlockInfo;
 import tachyon.thrift.ClientFileInfo;
 import tachyon.thrift.NetAddress;
 import tachyon.thrift.SuspectedFileSizeException;
+import tachyon.thrift.WorkerBlockInfo;
 
 /**
  * Tachyon file system's file representation in master.
@@ -117,8 +118,8 @@ public class InodeFile extends Inode {
       throw new BlockInfoException("BLOCK_INDEX unmatch: " + mBlocks.size() + " != " + blockInfo);
     }
     if (blockInfo.mOffset != mBlocks.size() * mBlockSizeByte) {
-      throw new BlockInfoException("OFFSET unmatch: " + mBlocks.size() * mBlockSizeByte + " != "
-          + blockInfo);
+      throw new BlockInfoException(
+          "OFFSET unmatch: " + mBlocks.size() * mBlockSizeByte + " != " + blockInfo);
     }
     if (blockInfo.mLength > mBlockSizeByte) {
       throw new BlockInfoException("LENGTH too big: " + mBlockSizeByte + " " + blockInfo);
@@ -273,6 +274,26 @@ public class InodeFile extends Inode {
       ret.add(tInfo.generateClientBlockInfo());
     }
     return ret;
+  }
+
+  /**
+   * newly added.
+   * 
+   * @param blockIndex
+   * @param address
+   * @return
+   * @throws BlockInfoException
+   */
+  public synchronized WorkerBlockInfo getWorkerBlockInfo(int blockIndex, NetAddress address)
+      throws BlockInfoException {
+    if (address == null) {
+      return null;
+    }
+    if (blockIndex < 0 || blockIndex >= mBlocks.size()) {
+      throw new BlockInfoException("BlockIndex is out of the boundry: " + blockIndex);
+    }
+
+    return mBlocks.get(blockIndex).generateWorkerBlockInfo(address);
   }
 
   /**
@@ -434,8 +455,8 @@ public class InodeFile extends Inode {
    * @throws SuspectedFileSizeException
    * @throws BlockInfoException
    */
-  public synchronized void setLength(long length) throws SuspectedFileSizeException,
-      BlockInfoException {
+  public synchronized void setLength(long length)
+      throws SuspectedFileSizeException, BlockInfoException {
     if (isComplete()) {
       throw new SuspectedFileSizeException("InodeFile length was set previously.");
     }
@@ -466,16 +487,28 @@ public class InodeFile extends Inode {
   @Override
   public synchronized void writeImage(ObjectWriter objWriter, DataOutputStream dos)
       throws IOException {
-    ImageElement ele =
-        new ImageElement(ImageElementType.InodeFile)
-            .withParameter("creationTimeMs", getCreationTimeMs()).withParameter("id", getId())
-            .withParameter("name", getName()).withParameter("parentId", getParentId())
-            .withParameter("blockSizeByte", getBlockSizeByte())
-            .withParameter("length", getLength()).withParameter("complete", isComplete())
-            .withParameter("pin", isPinned()).withParameter("cache", isCache())
-            .withParameter("ufsPath", getUfsPath()).withParameter("depId", getDependencyId())
-            .withParameter("lastModificationTimeMs", getLastModificationTimeMs());
+    ImageElement ele = new ImageElement(ImageElementType.InodeFile)
+        .withParameter("creationTimeMs", getCreationTimeMs()).withParameter("id", getId())
+        .withParameter("name", getName()).withParameter("parentId", getParentId())
+        .withParameter("blockSizeByte", getBlockSizeByte()).withParameter("length", getLength())
+        .withParameter("complete", isComplete()).withParameter("pin", isPinned())
+        .withParameter("cache", isCache()).withParameter("ufsPath", getUfsPath())
+        .withParameter("depId", getDependencyId())
+        .withParameter("lastModificationTimeMs", getLastModificationTimeMs());
 
     writeElement(objWriter, dos, ele);
+  }
+
+  /**
+   * total memory consumption over all workers
+   * 
+   * @return
+   */
+  public synchronized long getMemoryConsumptionBytes() {
+    long ret = 0;
+    for (BlockInfo blockInfo : mBlocks) {
+      ret += (blockInfo.getBlockSizeBytes() * blockInfo.getInMemoryCopies());
+    }
+    return ret;
   }
 }

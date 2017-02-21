@@ -42,7 +42,7 @@ public class BlockOutStream extends OutStream {
   private final long mBlockId;
   private final long mBlockOffset;
   private final boolean mPin;
-  private final Closer mCloser = Closer.create(); 
+  private final Closer mCloser = Closer.create();
   private final String mLocalFilePath;
   private final RandomAccessFile mLocalFile;
   private final FileChannel mLocalFileChannel;
@@ -114,8 +114,9 @@ public class BlockOutStream extends OutStream {
         mAvailableBytes += bytesRequested;
       } else {
         mCanWrite = false;
-        throw new IOException(String.format("No enough space on local worker: fileId(%d)"
-            + " blockId(%d) requestSize(%d)", mFile.mFileId, mBlockId, length - mAvailableBytes));
+        throw new IOException(String.format(
+            "No enough space on local worker: fileId(%d)" + " blockId(%d) requestSize(%d)",
+            mFile.mFileId, mBlockId, length - mAvailableBytes));
       }
     }
 
@@ -126,11 +127,12 @@ public class BlockOutStream extends OutStream {
   }
 
   @Override
-  public void cancel() throws IOException {
+  public void cancel() throws IOException  {
     if (!mClosed) {
       mCloser.close();
       mClosed = true;
       mTachyonFS.cancelBlock(mBlockId);
+      // mTachyonFS.cancelTempBlock(tachyon.master.BlockInfo.computeInodeId(mBlockId));
       LOG.info(String.format("Canceled output of block. blockId(%d) path(%s)", mBlockId,
           mLocalFilePath));
     }
@@ -192,8 +194,8 @@ public class BlockOutStream extends OutStream {
       throw new NullPointerException();
     } else if ((off < 0) || (off > b.length) || (len < 0) || ((off + len) > b.length)
         || ((off + len) < 0)) {
-      throw new IndexOutOfBoundsException(String.format("Buffer length (%d), offset(%d), len(%d)",
-          b.length, off, len));
+      throw new IndexOutOfBoundsException(
+          String.format("Buffer length (%d), offset(%d), len(%d)", b.length, off, len));
     }
 
     if (!canWrite()) {

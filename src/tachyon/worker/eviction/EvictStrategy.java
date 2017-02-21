@@ -40,5 +40,5 @@ public interface EvictStrategy {
    *         be evicted, null if no allocated directory is found
    */
   public Pair<StorageDir, List<BlockInfo>> getDirCandidate(StorageDir[] storageDirs,
-      Set<Integer> pinList, long requestBytes);
+      Set<Integer> pinList, long requestBytes, int fileId);
 }

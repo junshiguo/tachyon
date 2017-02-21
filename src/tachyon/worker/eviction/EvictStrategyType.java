@@ -26,5 +26,13 @@ public enum EvictStrategyType {
   /**
    * Evict old blocks in certain StorageDir by LRU.
    */
-  PARTIAL_LRU;
+  PARTIAL_LRU,
+  /**
+   * Evict based on global info. Calling master function to decide.
+   */
+  GLOBAL,
+
+  LFU,
+
+  MAXMIN;
 }

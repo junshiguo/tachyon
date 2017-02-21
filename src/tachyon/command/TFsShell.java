@@ -526,12 +526,17 @@ public class TFsShell implements Closeable {
       return -1;
     }
     TachyonURI path = new TachyonURI(argv[1]);
+    System.out.println("TFsShell.rm: get TachyonURI");
     TachyonFS tachyonClient = createFS(path);
+    System.out.println("TFsShell.rm: get TachyonFS");
     TachyonFile tFile = tachyonClient.getFile(path);
+    System.out.println("TFsShell.rm: get file");
     if (tFile != null && tFile.isDirectory()) {
       System.out.println("can't remove a directory, please try rmr <path>");
       return -1;
     }
+
+    System.out.println("TFsShell.rm: starting deleting " + path);
 
     if (tachyonClient.delete(path, false)) {
       System.out.println(path + " has been removed");

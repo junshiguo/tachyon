@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.Enumeration;
 
 import org.apache.thrift.transport.TNonblockingServerSocket;
@@ -174,5 +175,14 @@ public final class NetworkUtils {
     } catch (IllegalAccessException e) {
       throw Throwables.propagate(e);
     }
+  }
+
+  public static ByteBuffer clone(ByteBuffer original) {
+    ByteBuffer clone = ByteBuffer.allocate(original.capacity());
+    original.rewind();// copy from the beginning
+    clone.put(original);
+    original.rewind();
+    clone.flip();
+    return clone;
   }
 }

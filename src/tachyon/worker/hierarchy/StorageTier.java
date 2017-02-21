@@ -16,6 +16,8 @@
 package tachyon.worker.hierarchy;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -29,6 +31,8 @@ import tachyon.StorageLevelAlias;
 import tachyon.Users;
 import tachyon.conf.UserConf;
 import tachyon.conf.WorkerConf;
+import tachyon.thrift.NetAddress;
+import tachyon.worker.WorkerStorage;
 import tachyon.worker.allocation.AllocateStrategies;
 import tachyon.worker.allocation.AllocateStrategy;
 import tachyon.worker.eviction.EvictStrategies;
@@ -42,6 +46,8 @@ import tachyon.worker.eviction.EvictStrategy;
  */
 public class StorageTier {
   private static final Logger LOG = LoggerFactory.getLogger(Constants.LOGGER_TYPE);
+  /** Newly added. Just to call the getBlocksToEvict function */
+  private final WorkerStorage mWorkerStorage;
   /** Storage level of current StorageTier */
   private final int mLevel;
   /** Alias of current StorageTier's storage level */
@@ -74,24 +80,35 @@ public class StorageTier {
    */
   public StorageTier(int storageLevel, StorageLevelAlias storageLevelAlias, String[] dirPaths,
       long[] dirCapacityBytes, String dataFolder, String userTempFolder, StorageTier nextTier,
-      Object conf) throws IOException {
+      Object conf, WorkerStorage workerStorage) throws IOException {
+    mWorkerStorage = workerStorage;
     mLevel = storageLevel;
     mAlias = storageLevelAlias;
     mDirs = new StorageDir[dirPaths.length];
     long quotaBytes = 0;
-    for (int i = 0; i < dirPaths.length; i++) {
+    for (int i = 0; i < dirPaths.length; i ++) {
       long storageDirId = StorageDirId.getStorageDirId(storageLevel, mAlias.getValue(), i);
-      mDirs[i] =
-          new StorageDir(storageDirId, dirPaths[i], dirCapacityBytes[i], dataFolder,
-              userTempFolder, conf);
+      mDirs[i] = new StorageDir(mWorkerStorage, storageDirId, dirPaths[i], dirCapacityBytes[i],
+          dataFolder, userTempFolder, conf);
       quotaBytes += dirCapacityBytes[i];
     }
     mCapacityBytes = quotaBytes;
     mNextTier = nextTier;
     mSpaceAllocator =
         AllocateStrategies.getAllocateStrategy(WorkerConf.get().ALLOCATE_STRATEGY_TYPE);
-    mBlockEvictor =
-        EvictStrategies.getEvictStrategy(WorkerConf.get().EVICT_STRATEGY_TYPE, isLastTier());
+    mBlockEvictor = EvictStrategies.getEvictStrategy(WorkerConf.get().EVICT_STRATEGY_TYPE,
+        isLastTier(), mWorkerStorage);
+    LOG.info("***EvictStrategy: {}", WorkerConf.get().EVICT_STRATEGY_TYPE);
+  }
+
+  /**
+   * for test only
+   */
+  public StorageTier(int storageLevel, StorageLevelAlias storageLevelAlias, String[] dirPaths,
+      long[] dirCapacityBytes, String dataFolder, String userTempFolder, StorageTier nextTier,
+      Object conf) throws IOException {
+    this(storageLevel, storageLevelAlias, dirPaths, dirCapacityBytes, dataFolder, userTempFolder,
+        nextTier, conf, null);
   }
 
   /**
@@ -222,8 +239,8 @@ public class StorageTier {
    * @throws IOException
    */
   public StorageDir requestSpace(long userId, long requestBytes, Set<Integer> pinList,
-      List<Long> removedBlockIds) throws IOException {
-    return requestSpace(mDirs, userId, requestBytes, pinList, removedBlockIds);
+      List<Long> removedBlockIds, int fileId) throws IOException {
+    return requestSpace(mDirs, userId, requestBytes, pinList, removedBlockIds, fileId);
   }
 
   /**
@@ -238,13 +255,13 @@ public class StorageTier {
    * @throws IOException
    */
   public boolean requestSpace(StorageDir storageDir, long userId, long requestBytes,
-      Set<Integer> pinList, List<Long> removedBlockIds) throws IOException {
+      Set<Integer> pinList, List<Long> removedBlockIds, int fileId) throws IOException {
     if (StorageDirId.getStorageLevel(storageDir.getStorageDirId()) != mLevel) {
       return false;
     }
     StorageDir[] dirs = new StorageDir[1];
     dirs[0] = storageDir;
-    return storageDir == requestSpace(dirs, userId, requestBytes, pinList, removedBlockIds);
+    return storageDir == requestSpace(dirs, userId, requestBytes, pinList, removedBlockIds, fileId);
   }
 
   /**
@@ -260,7 +277,8 @@ public class StorageTier {
    */
   // TODO make block eviction asynchronous, then no need to be synchronized
   private synchronized StorageDir requestSpace(StorageDir[] dirs, long userId,
-      long requestSizeBytes, Set<Integer> pinList, List<Long> removedBlockIds) throws IOException {
+      long requestSizeBytes, Set<Integer> pinList, List<Long> removedBlockIds, int fileId)
+          throws IOException {
     StorageDir dirSelected = mSpaceAllocator.getStorageDir(dirs, userId, requestSizeBytes);
     if (dirSelected != null) {
       return dirSelected;
@@ -269,7 +287,7 @@ public class StorageTier {
     if (mSpaceAllocator.fitInPossible(dirs, requestSizeBytes)) {
       for (int attempt = 0; attempt < FAILED_SPACE_REQUEST_LIMITS; attempt ++) {
         Pair<StorageDir, List<BlockInfo>> evictInfo =
-            mBlockEvictor.getDirCandidate(dirs, pinList, requestSizeBytes);
+            mBlockEvictor.getDirCandidate(dirs, pinList, requestSizeBytes, fileId);
         if (evictInfo == null) {
           return null;
         }
@@ -283,9 +301,8 @@ public class StorageTier {
               dir.deleteBlock(blockId);
               removedBlockIds.add(blockId);
             } else {
-              StorageDir dstDir =
-                  mNextTier.requestSpace(Users.MIGRATE_DATA_USER_ID, blockInfo.getSize(), pinList,
-                      removedBlockIds);
+              StorageDir dstDir = mNextTier.requestSpace(Users.MIGRATE_DATA_USER_ID,
+                  blockInfo.getSize(), pinList, removedBlockIds, fileId);
               dir.moveBlock(blockId, dstDir);
             }
             LOG.debug("Evicted block Id:{}" + blockId);
@@ -306,5 +323,17 @@ public class StorageTier {
   @Override
   public String toString() {
     return mLevel + "_" + mAlias;
+  }
+
+  public Set<Long> getLockedBlocks() {
+    List<Long> ret = new ArrayList<Long>();
+    for (StorageDir dir : mDirs) {
+      ret.addAll(dir.getLockedBlocks());
+    }
+    return new HashSet<>(ret);
+  }
+
+  public StorageDir[] getmDirs() {
+    return mDirs;
   }
 }

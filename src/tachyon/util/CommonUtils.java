@@ -73,8 +73,8 @@ public final class CommonUtils {
       redirectIO(process);
 
       if (process.exitValue() != 0) {
-        throw new IOException("Can not change the file " + file.getAbsolutePath()
-            + " 's permission to be " + perms);
+        throw new IOException(
+            "Can not change the file " + file.getAbsolutePath() + " 's permission to be " + perms);
       }
     } catch (InterruptedException e) {
       LOG.error(e.getMessage());
@@ -123,7 +123,7 @@ public final class CommonUtils {
       return;
     }
     if (buffer.isDirect()) {
-      Cleaner cleaner = ((DirectBuffer)buffer).cleaner();
+      Cleaner cleaner = ((DirectBuffer) buffer).cleaner();
       cleaner.clean();
     }
   }
@@ -195,8 +195,8 @@ public final class CommonUtils {
     long mins = (Millis % Constants.HOUR_MS) / Constants.MINUTE_MS;
     long secs = (Millis % Constants.MINUTE_MS) / Constants.SECOND_MS;
 
-    return String.format("%d day(s), %d hour(s), %d minute(s), and %d second(s)", days, hours,
-        mins, secs);
+    return String.format("%d day(s), %d hour(s), %d minute(s), and %d second(s)", days, hours, mins,
+        secs);
   }
 
   public static String convertMsToDate(long Millis) {

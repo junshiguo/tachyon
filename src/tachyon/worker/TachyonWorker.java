@@ -18,6 +18,7 @@ package tachyon.worker;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -123,10 +124,9 @@ public class TachyonWorker implements Runnable {
     LOG.info("Resolved local TachyonWorker host to " + resolvedWorkerHost);
 
     try {
-      TachyonWorker worker =
-          TachyonWorker.createWorker(getMasterLocation(args), resolvedWorkerHost + ":" + wConf.PORT,
-              wConf.DATA_PORT, wConf.SELECTOR_THREADS, wConf.QUEUE_SIZE_PER_SELECTOR,
-              wConf.SERVER_THREADS);
+      TachyonWorker worker = TachyonWorker.createWorker(getMasterLocation(args),
+          resolvedWorkerHost + ":" + wConf.PORT, wConf.DATA_PORT, wConf.SELECTOR_THREADS,
+          wConf.QUEUE_SIZE_PER_SELECTOR, wConf.SERVER_THREADS);
       worker.start();
     } catch (Exception e) {
       LOG.error("Uncaught exception terminating worker", e);
@@ -151,8 +151,8 @@ public class TachyonWorker implements Runnable {
 
   private final int mPort;
   private final int mDataPort;
-  private final ExecutorService mExecutorService = Executors.newFixedThreadPool(1,
-      ThreadFactoryUtils.daemon("heartbeat-worker-%d"));
+  private final ExecutorService mExecutorService =
+      Executors.newFixedThreadPool(1, ThreadFactoryUtils.daemon("heartbeat-worker-%d"));
 
   /**
    * @param masterAddress The TachyonMaster's address.
@@ -192,9 +192,8 @@ public class TachyonWorker implements Runnable {
 
       mServerTNonblockingServerSocket = new TNonblockingServerSocket(workerAddress);
       mPort = NetworkUtils.getPort(mServerTNonblockingServerSocket);
-      mServer =
-          new TThreadedSelectorServer(new TThreadedSelectorServer.Args(
-              mServerTNonblockingServerSocket).processor(processor)
+      mServer = new TThreadedSelectorServer(
+          new TThreadedSelectorServer.Args(mServerTNonblockingServerSocket).processor(processor)
               .selectorThreads(selectorThreads).acceptQueueSizePerThread(acceptQueueSizePerThreads)
               .workerThreads(workerThreads));
     } catch (TTransportException e) {
@@ -276,8 +275,8 @@ public class TachyonWorker implements Runnable {
         CommonUtils.sleepMs(LOG, Constants.SECOND_MS);
         cmd = null;
         if (System.currentTimeMillis() - lastHeartbeatMs >= WorkerConf.get().HEARTBEAT_TIMEOUT_MS) {
-          throw new RuntimeException("Heartbeat timeout "
-              + (System.currentTimeMillis() - lastHeartbeatMs) + "ms");
+          throw new RuntimeException(
+              "Heartbeat timeout " + (System.currentTimeMillis() - lastHeartbeatMs) + "ms");
         }
       }
 

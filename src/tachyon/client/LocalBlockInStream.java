@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 public class LocalBlockInStream extends BlockInStream {
   private TachyonByteBuffer mTachyonBuffer = null;
   private ByteBuffer mBuffer = null;
+  private BlockAccessInfo mAccessInfo;
 
   /**
    * @param file the file the block belongs to
@@ -38,10 +39,22 @@ public class LocalBlockInStream extends BlockInStream {
 
     mTachyonBuffer = buf;
     mBuffer = mTachyonBuffer.mData;
+    // mTachyonFS.addBlockAccessInfo(file.mFileId,
+    // tachyon.master.BlockInfo.computeBlockId(file.mFileId, blockIndex), mBuffer.limit(),
+    // BlockAccessInfo.READ_MEMORY);
+    mAccessInfo = new BlockAccessInfo(file.mFileId,
+        tachyon.master.BlockInfo.computeBlockId(file.mFileId, blockIndex), mBuffer.limit(),
+        System.currentTimeMillis(), BlockAccessInfo.READ_MEMORY);
+    mReadSource = BlockAccessInfo.READ_MEMORY;
   }
 
   @Override
   public void close() throws IOException {
+    // long blockId = tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, mBlockIndex);
+    // mTachyonFS.addBlockReadSource(blockId, BlockAccessInfo.READ_MEMORY);
+    // mTachyonFS.closeBlockAccessInfo(blockId);
+    mAccessInfo.setClose();
+    mTachyonFS.addBlockAccessInfo(mAccessInfo);
     if (!mClosed) {
       mTachyonBuffer.close();
     }
@@ -86,8 +99,8 @@ public class LocalBlockInStream extends BlockInStream {
     if (pos < 0) {
       throw new IOException("Seek position is negative: " + pos);
     } else if (pos > mBuffer.limit()) {
-      throw new IOException("Seek position is past buffer limit: " + pos + ", Buffer Size = "
-          + mBuffer.limit());
+      throw new IOException(
+          "Seek position is past buffer limit: " + pos + ", Buffer Size = " + mBuffer.limit());
     }
     mBuffer.position((int) pos);
   }
@@ -105,4 +118,5 @@ public class LocalBlockInStream extends BlockInStream {
     mBuffer.position(mBuffer.position() + ret);
     return ret;
   }
+
 }

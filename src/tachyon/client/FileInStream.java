@@ -65,7 +65,11 @@ public class FileInStream extends InStream {
   private void checkAndAdvanceBlockInStream() throws IOException {
     if (mCurrentBlockLeft == 0) {
       if (mCurrentBlockInStream != null) {
-        mCurrentBlockInStream.close();
+        try {
+          mCurrentBlockInStream.close();
+        } catch (IOException e) {
+          mCurrentBlockInStream = null;
+        }
       }
 
       mCurrentBlockIndex = getCurrentBlockIndex();
@@ -83,8 +87,12 @@ public class FileInStream extends InStream {
     mClosed = true;
   }
 
-  private int getCurrentBlockIndex() {
+  public int getCurrentBlockIndex() {
     return (int) (mCurrentPosition / mBlockCapacity);
+  }
+
+  public long getCurrentBlockId() {
+    return tachyon.master.BlockInfo.computeBlockId(mFile.mFileId, getCurrentBlockIndex());
   }
 
   @Override
@@ -187,17 +195,18 @@ public class FileInStream extends InStream {
       long skip = mCurrentBlockInStream.skip(shouldSkip);
       mCurrentBlockLeft = mBlockCapacity - skip;
       if (skip != shouldSkip) {
-        throw new IOException("The underlayer BlockInStream only skip " + skip + " instead of "
-            + shouldSkip);
+        throw new IOException(
+            "The underlayer BlockInStream only skip " + skip + " instead of " + shouldSkip);
       }
     } else {
       long skip = mCurrentBlockInStream.skip(ret);
       if (skip != ret) {
-        throw new IOException("The underlayer BlockInStream only skip " + skip + " instead of "
-            + ret);
+        throw new IOException(
+            "The underlayer BlockInStream only skip " + skip + " instead of " + ret);
       }
     }
 
     return ret;
   }
+
 }

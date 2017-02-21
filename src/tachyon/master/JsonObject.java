@@ -37,8 +37,8 @@ abstract class JsonObject {
   public static ObjectMapper createObjectMapper() {
     // TODO: Could disable field name quoting, though this would produce technically invalid JSON
     // See: JsonGenerator.QUOTE_FIELD_NAMES and JsonParser.ALLOW_UNQUOTED_FIELD_NAMES
-    return new ObjectMapper().configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false).configure(
-        SerializationFeature.CLOSE_CLOSEABLE, false);
+    return new ObjectMapper().configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
+        .configure(SerializationFeature.CLOSE_CLOSEABLE, false);
   }
 
   private static final ObjectMapper OBJECT_MAPPER = createObjectMapper();

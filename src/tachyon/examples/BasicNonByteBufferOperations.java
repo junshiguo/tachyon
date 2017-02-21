@@ -117,9 +117,10 @@ public final class BasicNonByteBufferOperations implements Callable<Boolean> {
       usage();
     }
 
-    Utils.runExample(new BasicNonByteBufferOperations(new TachyonURI(args[0]), new TachyonURI(
-        args[1]), Utils.option(args, 2, WriteType.MUST_CACHE), Utils.option(args, 3,
-        ReadType.NO_CACHE), Utils.option(args, 4, true), Utils.option(args, 5, 20)));
+    Utils.runExample(
+        new BasicNonByteBufferOperations(new TachyonURI(args[0]), new TachyonURI(args[1]),
+            Utils.option(args, 2, WriteType.MUST_CACHE), Utils.option(args, 3, ReadType.NO_CACHE),
+            Utils.option(args, 4, true), Utils.option(args, 5, 20)));
   }
 
   private static void usage() {

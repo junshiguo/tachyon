@@ -249,12 +249,11 @@ public class InodeFolder extends Inode {
    */
   @Override
   public void writeImage(ObjectWriter objWriter, DataOutputStream dos) throws IOException {
-    ImageElement ele =
-        new ImageElement(ImageElementType.InodeFolder)
-            .withParameter("creationTimeMs", getCreationTimeMs()).withParameter("id", getId())
-            .withParameter("name", getName()).withParameter("parentId", getParentId())
-            .withParameter("pinned", isPinned()).withParameter("childrenIds", getChildrenIds())
-            .withParameter("lastModificationTimeMs", getLastModificationTimeMs());
+    ImageElement ele = new ImageElement(ImageElementType.InodeFolder)
+        .withParameter("creationTimeMs", getCreationTimeMs()).withParameter("id", getId())
+        .withParameter("name", getName()).withParameter("parentId", getParentId())
+        .withParameter("pinned", isPinned()).withParameter("childrenIds", getChildrenIds())
+        .withParameter("lastModificationTimeMs", getLastModificationTimeMs());
 
     writeElement(objWriter, dos, ele);
 

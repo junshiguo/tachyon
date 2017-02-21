@@ -28,10 +28,10 @@ import com.google.common.collect.ImmutableList;
  */
 class Utils {
   private static final Logger LOG = LoggerFactory.getLogger("");
-  private static final CharMatcher LIST_SPLITTER_MATCHER = CharMatcher.is(',').or(
-      CharMatcher.WHITESPACE);
-  private static final Splitter LIST_SPLITTER = Splitter.on(LIST_SPLITTER_MATCHER)
-      .omitEmptyStrings().trimResults();
+  private static final CharMatcher LIST_SPLITTER_MATCHER =
+      CharMatcher.is(',').or(CharMatcher.WHITESPACE);
+  private static final Splitter LIST_SPLITTER =
+      Splitter.on(LIST_SPLITTER_MATCHER).omitEmptyStrings().trimResults();
 
   public static boolean getBooleanProperty(String property) {
     return Boolean.valueOf(getProperty(property));

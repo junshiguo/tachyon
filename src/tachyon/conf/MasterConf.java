@@ -20,6 +20,7 @@ import java.util.Arrays;
 
 import tachyon.Constants;
 import tachyon.TachyonURI;
+import tachyon.util.CommonUtils;
 import tachyon.util.NetworkUtils;
 
 /**
@@ -58,11 +59,13 @@ public class MasterConf extends Utils {
   public final int SERVER_THREADS;
   public final int WORKER_TIMEOUT_MS;
   public final int WEB_THREAD_COUNT;
-  
+
   public final String KEYTAB_KEY;
   public final String KEYTAB;
   public final String PRINCIPAL_KEY;
   public final String PRINCIPAL;
+
+  public final long MEMORY_QUEUE_SIZE;
 
   public final ArrayList<String> WHITELIST = new ArrayList<String>();
 
@@ -77,9 +80,8 @@ public class MasterConf extends Utils {
 
     HOSTNAME = getProperty("tachyon.master.hostname", NetworkUtils.getLocalHostName());
     PORT = getIntProperty("tachyon.master.port", Constants.DEFAULT_MASTER_PORT);
-    MASTER_ADDRESS =
-        (CommonConf.get().USE_ZOOKEEPER ? Constants.HEADER_FT : Constants.HEADER) + HOSTNAME + ":"
-            + PORT;
+    MASTER_ADDRESS = (CommonConf.get().USE_ZOOKEEPER ? Constants.HEADER_FT : Constants.HEADER)
+        + HOSTNAME + ":" + PORT;
     WEB_PORT = getIntProperty("tachyon.master.web.port", Constants.DEFAULT_MASTER_WEB_PORT);
     WEB_THREAD_COUNT = getIntProperty("tachyon.master.web.threads", 1);
     TEMPORARY_FOLDER = getProperty("tachyon.master.temporary.folder", "/tmp");
@@ -88,23 +90,25 @@ public class MasterConf extends Utils {
         getIntProperty("tachyon.master.heartbeat.interval.ms", Constants.SECOND_MS);
     SELECTOR_THREADS = getIntProperty("tachyon.master.selector.threads", 3);
     QUEUE_SIZE_PER_SELECTOR = getIntProperty("tachyon.master.queue.size.per.selector", 3000);
-    SERVER_THREADS =
-        getIntProperty("tachyon.master.server.threads", 2 * Runtime.getRuntime()
-            .availableProcessors());
+    SERVER_THREADS = getIntProperty("tachyon.master.server.threads",
+        2 * Runtime.getRuntime().availableProcessors());
     WORKER_TIMEOUT_MS =
         getIntProperty("tachyon.master.worker.timeout.ms", 10 * Constants.SECOND_MS);
-    
+
     KEYTAB_KEY = "tachyon.master.keytab.file";
     KEYTAB = getProperty(KEYTAB_KEY, null);
     PRINCIPAL_KEY = "tachyon.master.principal";
     PRINCIPAL = getProperty(PRINCIPAL_KEY, null);
 
-    WHITELIST.addAll(Arrays.asList(getProperty("tachyon.master.whitelist", TachyonURI.SEPARATOR)
-        .split(",")));
+    WHITELIST.addAll(
+        Arrays.asList(getProperty("tachyon.master.whitelist", TachyonURI.SEPARATOR).split(",")));
     String tPinList = getProperty("tachyon.master.pinlist", null);
     if (tPinList != null && !tPinList.isEmpty()) {
       System.err.println("WARNING: tachyon.master.pinlist is set but no longer supported!"
           + " Please use the pin function in the TFS Shell instead.");
     }
+
+    MEMORY_QUEUE_SIZE = CommonUtils
+        .parseSpaceSize(getProperty("tachyon.master.memory.queue.size", (100 * Constants.GB) + ""));
   }
 }

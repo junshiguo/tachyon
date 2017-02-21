@@ -63,7 +63,7 @@ public class UIWebServer {
     SelectChannelConnector connector = new SelectChannelConnector();
     connector.setPort(address.getPort());
     connector.setAcceptors(MasterConf.get().WEB_THREAD_COUNT);
-    mServer.setConnectors(new Connector[] { connector });
+    mServer.setConnectors(new Connector[] {connector});
 
     QueuedThreadPool threadPool = new QueuedThreadPool();
     // Jetty needs at least (1 + selectors + acceptors) threads.
@@ -76,8 +76,8 @@ public class UIWebServer {
     webappcontext.setContextPath(TachyonURI.SEPARATOR);
     File warPath = new File(CommonConf.get().WEB_RESOURCES);
     webappcontext.setWar(warPath.getAbsolutePath());
-    webappcontext
-        .addServlet(new ServletHolder(new WebInterfaceGeneralServlet(masterInfo)), "/home");
+    webappcontext.addServlet(new ServletHolder(new WebInterfaceGeneralServlet(masterInfo)),
+        "/home");
     webappcontext.addServlet(new ServletHolder(new WebInterfaceWorkersServlet(masterInfo)),
         "/workers");
     webappcontext.addServlet(new ServletHolder(new WebInterfaceConfigurationServlet(masterInfo)),

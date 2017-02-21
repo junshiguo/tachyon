@@ -78,8 +78,8 @@ public class TachyonMaster {
   private int mAcceptQueueSizePerThread;
   private int mWorkerThreads;
   private boolean mZookeeperMode = false;
-  private final ExecutorService mExecutorService = Executors.newFixedThreadPool(2,
-      ThreadFactoryUtils.daemon("heartbeat-master-%d"));
+  private final ExecutorService mExecutorService =
+      Executors.newFixedThreadPool(2, ThreadFactoryUtils.daemon("heartbeat-master-%d"));
 
   private LeaderSelectorClient mLeaderSelectorClient = null;
 
@@ -121,9 +121,8 @@ public class TachyonMaster {
         CommonConf conf = CommonConf.get();
         // InetSocketAddress.toString causes test issues, so build the string by hand
         String name = NetworkUtils.getFqdnHost(mMasterAddress) + ":" + mMasterAddress.getPort();
-        mLeaderSelectorClient =
-            new LeaderSelectorClient(conf.ZOOKEEPER_ADDRESS, conf.ZOOKEEPER_ELECTION_PATH,
-                conf.ZOOKEEPER_LEADER_PATH, name);
+        mLeaderSelectorClient = new LeaderSelectorClient(conf.ZOOKEEPER_ADDRESS,
+            conf.ZOOKEEPER_ELECTION_PATH, conf.ZOOKEEPER_LEADER_PATH, name);
         mEditLogProcessor = new EditLogProcessor(mJournal, journalFolder, mMasterInfo);
         // TODO move this to executor service when the shared thread patch goes in
         Thread logProcessor = new Thread(mEditLogProcessor);
@@ -136,7 +135,7 @@ public class TachyonMaster {
   }
 
   /**
-   * Get MasterInfo instance for Unit Test
+   * Get MasterInfo instance for Unit AccessFile
    * 
    * @return MasterInfo of the Master
    */
@@ -205,19 +204,17 @@ public class TachyonMaster {
     }
     mMasterInfo.init();
 
-    mWebServer =
-        new UIWebServer("Tachyon Master Server", new InetSocketAddress(
-            NetworkUtils.getFqdnHost(mMasterAddress), mWebPort), mMasterInfo);
+    mWebServer = new UIWebServer("Tachyon Master Server",
+        new InetSocketAddress(NetworkUtils.getFqdnHost(mMasterAddress), mWebPort), mMasterInfo);
 
     mMasterServiceHandler = new MasterServiceHandler(mMasterInfo);
     MasterService.Processor<MasterServiceHandler> masterServiceProcessor =
         new MasterService.Processor<MasterServiceHandler>(mMasterServiceHandler);
 
-    mMasterServiceServer =
-        new TThreadedSelectorServer(new TThreadedSelectorServer.Args(
-            mServerTNonblockingServerSocket).processor(masterServiceProcessor)
-            .selectorThreads(mSelectorThreads).acceptQueueSizePerThread(mAcceptQueueSizePerThread)
-            .workerThreads(mWorkerThreads));
+    mMasterServiceServer = new TThreadedSelectorServer(
+        new TThreadedSelectorServer.Args(mServerTNonblockingServerSocket)
+            .processor(masterServiceProcessor).selectorThreads(mSelectorThreads)
+            .acceptQueueSizePerThread(mAcceptQueueSizePerThread).workerThreads(mWorkerThreads));
 
     mIsStarted = true;
   }
